@@ -1,4 +1,7 @@
-from fastapi import APIRouter
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+from fastapi import APIRouter, File, UploadFile
 
 from backend.app.audit.evidence import record_event
 from backend.app.core.config import get_settings
@@ -6,7 +9,7 @@ from backend.app.db.connection import get_connection
 from backend.app.models.api import ContractAnalysisResponse, ContractTextRequest, HealthResponse
 from backend.app.models.deal import DealAnalysis
 from backend.app.optimization.engine import health_score, identify_fragile_terms, recommend_changes
-from backend.app.services.contract_ingestion import normalize_contract_text
+from backend.app.services.contract_ingestion import extract_text_from_pdf, normalize_contract_text
 from backend.app.services.scenario_generation import generate_stress_scenarios
 from backend.app.services.term_extraction import extract_commercial_terms
 from backend.app.simulation.engine import evaluate_deal
@@ -23,7 +26,26 @@ def health() -> HealthResponse:
 
 @router.post("/contracts/analyze-text", response_model=ContractAnalysisResponse)
 def analyze_contract_text(payload: ContractTextRequest) -> ContractAnalysisResponse:
-    normalized_text = normalize_contract_text(payload.text)
+    return _analyze_contract_text(payload.text, payload.filename)
+
+
+@router.post("/contracts/analyze-pdf", response_model=ContractAnalysisResponse)
+async def analyze_contract_pdf(file: UploadFile = File(...)) -> ContractAnalysisResponse:
+    suffix = Path(file.filename or "contract.pdf").suffix or ".pdf"
+    with NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+        temp_file.write(await file.read())
+        temp_path = Path(temp_file.name)
+
+    try:
+        text = extract_text_from_pdf(temp_path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+    return _analyze_contract_text(text, file.filename)
+
+
+def _analyze_contract_text(text: str, filename: str | None) -> ContractAnalysisResponse:
+    normalized_text = normalize_contract_text(text)
     terms = extract_commercial_terms(normalized_text)
     scenarios = generate_stress_scenarios(terms)
     results = evaluate_deal(terms, scenarios)
@@ -34,7 +56,7 @@ def analyze_contract_text(payload: ContractTextRequest) -> ContractAnalysisRespo
     with get_connection() as connection:
         contract_cursor = connection.execute(
             "INSERT INTO contracts (filename, raw_text) VALUES (?, ?)",
-            (payload.filename, normalized_text),
+            (filename, normalized_text),
         )
         contract_id = int(contract_cursor.lastrowid)
         terms_cursor = connection.execute(

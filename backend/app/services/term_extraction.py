@@ -22,7 +22,11 @@ def _integer(pattern: str, text: str, default: int) -> int:
 
 def extract_commercial_terms(text: str) -> CommercialTerms:
     """Deterministic MVP extractor; replace/enrich with LLM extraction evidence later."""
-    customer_match = re.search(r"(?:customer|client)\s*:\s*([A-Za-z0-9 .,&-]+)", text, re.IGNORECASE)
+    customer_match = re.search(
+        r"(?:customer|client)\s*:\s*([A-Za-z0-9 .,&-]+?)(?:\.?\s+(?:ACV|annual contract value|term|contract term)|\n|$)",
+        text,
+        re.IGNORECASE,
+    )
     customer_name = customer_match.group(1).strip() if customer_match else None
 
     return CommercialTerms(

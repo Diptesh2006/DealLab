@@ -1,6 +1,7 @@
 import { ShieldCheck, SlidersHorizontal, Upload } from "lucide-react";
 
 import { BackendStatus } from "@/components/BackendStatus";
+import { DealAnalyzer } from "@/components/DealAnalyzer";
 
 const capabilities = [
   {
@@ -50,26 +51,7 @@ export default function Home() {
         ))}
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-10">
-        <div className="overflow-hidden rounded-md border border-ink/10 bg-white">
-          <div className="grid grid-cols-5 border-b border-ink/10 bg-ink/5 px-4 py-3 text-sm font-medium text-steel">
-            <span>Scenario</span>
-            <span>Revenue</span>
-            <span>Cost</span>
-            <span>Margin</span>
-            <span>Exposure</span>
-          </div>
-          {["Base case", "Low adoption", "High service load", "Late payment pressure"].map((scenario) => (
-            <div key={scenario} className="grid grid-cols-5 px-4 py-3 text-sm text-ink odd:bg-white even:bg-paper">
-              <span className="font-medium">{scenario}</span>
-              <span>Backend</span>
-              <span>Deterministic</span>
-              <span>Guardrailed</span>
-              <span>Tracked</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <DealAnalyzer />
     </main>
   );
 }
