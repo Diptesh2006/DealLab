@@ -43,6 +43,45 @@ CREATE TABLE IF NOT EXISTS audit_events (
     evidence TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS deals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_name TEXT NOT NULL,
+    deal_name TEXT NOT NULL,
+    target_gross_margin REAL NOT NULL,
+    internal_cost_assumptions TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS deal_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    document_type TEXT NOT NULL,
+    precedence_order INTEGER NOT NULL,
+    raw_text TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+);
+
+CREATE TABLE IF NOT EXISTS effective_terms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id INTEGER NOT NULL,
+    field_name TEXT NOT NULL,
+    normalized_value TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    effective_from TEXT,
+    source_document TEXT,
+    source_page INTEGER,
+    evidence_excerpt TEXT,
+    confidence REAL NOT NULL,
+    extraction_type TEXT NOT NULL,
+    review_status TEXT NOT NULL,
+    ambiguous INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+);
 """
 
 
