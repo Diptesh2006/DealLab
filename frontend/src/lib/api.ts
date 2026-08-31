@@ -38,6 +38,93 @@ export type ContractAnalysisResponse = {
   };
 };
 
+export type ReviewStatus =
+  | "confirmed"
+  | "inferred"
+  | "requires_assumption"
+  | "requires_human_review";
+
+export type EffectiveTerm = {
+  id: number;
+  field_name: string;
+  normalized_value: string;
+  unit: string;
+  effective_from: string | null;
+  source_document: string | null;
+  source_page: number | null;
+  evidence_excerpt: string | null;
+  confidence: number;
+  extraction_type: "explicit" | "inferred" | "unknown";
+  review_status: ReviewStatus;
+  ambiguous: boolean;
+};
+
+export type DealDocument = {
+  id: number;
+  filename: string;
+  document_type: "master_agreement" | "amendment" | "approved_exception";
+  precedence_order: number;
+};
+
+export type DealIntelligenceResponse = {
+  deal_id: number;
+  customer_name: string;
+  deal_name: string;
+  target_gross_margin: number;
+  documents: DealDocument[];
+  effective_terms: EffectiveTerm[];
+};
+
+export type CompanyAssumptions = {
+  cost_per_api_call: number;
+  monthly_infrastructure_cost: number;
+  cost_per_support_hour: number;
+  implementation_cost: number;
+  minimum_acceptable_gross_margin: number;
+  typical_support_consumption_hours: number;
+  expected_annual_cost_inflation: number;
+};
+
+export type EconomicScenarioInput = {
+  name: string;
+  expected_usage_units: number;
+  usage_revenue: number;
+  support_hours?: number | null;
+  apply_temporary_discount: boolean;
+  apply_service_credits: boolean;
+  apply_rebates: boolean;
+  renewal_number: number;
+};
+
+export type FinancialLineItem = {
+  label: string;
+  amount: number;
+  formatted_amount: string;
+  trace: {
+    contract_term: string | null;
+    company_assumption: string | null;
+    scenario_input: string | null;
+  };
+};
+
+export type ScenarioEconomicsResult = {
+  scenario_name: string;
+  currency: string;
+  gross_revenue: number;
+  effective_revenue_after_discounts: number;
+  variable_costs: number;
+  support_costs: number;
+  credits_penalties: number;
+  total_cost: number;
+  gross_profit: number;
+  gross_margin_percent: number;
+  arr: number;
+  expected_customer_contribution: number;
+  downside_exposure: number;
+  difference_from_target_margin: number;
+  breakdown: FinancialLineItem[];
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export async function getHealth(): Promise<HealthResponse> {
@@ -64,4 +151,59 @@ export async function analyzeContractText(text: string, filename?: string): Prom
   }
 
   return response.json();
+}
+
+export async function analyzeDeal(formData: FormData): Promise<DealIntelligenceResponse> {
+  const response = await fetch(`${baseUrl}/api/deals/analyze`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Deal analysis failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function updateEffectiveTerm(
+  dealId: number,
+  termId: number,
+  payload: { normalized_value: string; unit: string; reason: string },
+): Promise<EffectiveTerm> {
+  const response = await fetch(`${baseUrl}/api/deals/${dealId}/terms/${termId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Manual term edit failed: ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.term;
+}
+
+export async function evaluateEconomics(payload: {
+  terms: EffectiveTerm[];
+  assumptions: CompanyAssumptions;
+  scenario: EconomicScenarioInput;
+}): Promise<ScenarioEconomicsResult> {
+  const response = await fetch(`${baseUrl}/api/economics/evaluate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Economics evaluation failed: ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.result;
 }
