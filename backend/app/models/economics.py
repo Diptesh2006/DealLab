@@ -18,6 +18,7 @@ class EconomicScenarioInput(BaseModel):
     expected_usage_units: float = Field(ge=0)
     usage_revenue: float = Field(default=0, ge=0)
     support_hours: float | None = Field(default=None, ge=0)
+    cost_multiplier: float = Field(default=1, gt=0)
     apply_temporary_discount: bool = True
     apply_service_credits: bool = False
     apply_rebates: bool = True

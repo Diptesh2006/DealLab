@@ -19,6 +19,7 @@ from backend.app.models.intelligence import (
     ManualTermEditResponse,
     ReviewStatus,
 )
+from backend.app.models.stress import StressTestRequest, StressTestResponse
 from backend.app.optimization.engine import health_score, identify_fragile_terms, recommend_changes
 from backend.app.services.contract_ingestion import extract_text_from_pdf, normalize_contract_text
 from backend.app.services.commercial_intelligence import SourceDocument, derive_effective_terms
@@ -26,6 +27,7 @@ from backend.app.services.scenario_generation import generate_stress_scenarios
 from backend.app.services.term_extraction import extract_commercial_terms
 from backend.app.simulation.engine import evaluate_deal
 from backend.app.simulation.economics import evaluate_financial_scenario
+from backend.app.simulation.stress import run_stress_test
 
 router = APIRouter()
 
@@ -185,6 +187,17 @@ def update_effective_term(deal_id: int, term_id: int, payload: ManualTermEditReq
 def evaluate_economics(payload: EconomicsEvaluationRequest) -> EconomicsEvaluationResponse:
     return EconomicsEvaluationResponse(
         result=evaluate_financial_scenario(payload.terms, payload.assumptions, payload.scenario)
+    )
+
+
+@router.post("/stress-tests/evaluate", response_model=StressTestResponse)
+def evaluate_stress_test(payload: StressTestRequest) -> StressTestResponse:
+    return run_stress_test(
+        terms=payload.terms,
+        assumptions=payload.assumptions,
+        expected_usage_units=payload.expected_usage_units,
+        expected_usage_revenue=payload.expected_usage_revenue,
+        health_config=payload.health_config,
     )
 
 

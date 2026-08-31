@@ -40,9 +40,9 @@ def evaluate_financial_scenario(
     effective_revenue = capped_revenue - rebates - credits_penalties
 
     inflation_multiplier = 1 + assumptions.expected_annual_cost_inflation / 100
-    variable_costs = scenario.expected_usage_units * assumptions.cost_per_api_call
-    infrastructure_cost = assumptions.monthly_infrastructure_cost * 12 * inflation_multiplier
-    support_costs = support_hours * assumptions.cost_per_support_hour * inflation_multiplier
+    variable_costs = scenario.expected_usage_units * assumptions.cost_per_api_call * scenario.cost_multiplier
+    infrastructure_cost = assumptions.monthly_infrastructure_cost * 12 * inflation_multiplier * scenario.cost_multiplier
+    support_costs = support_hours * assumptions.cost_per_support_hour * inflation_multiplier * scenario.cost_multiplier
     implementation_cost = assumptions.implementation_cost
     total_cost = variable_costs + infrastructure_cost + support_costs + implementation_cost
     gross_profit = effective_revenue - total_cost
