@@ -9,6 +9,7 @@ from backend.app.core.config import get_settings
 from backend.app.db.connection import get_connection
 from backend.app.models.api import ContractAnalysisResponse, ContractTextRequest, HealthResponse
 from backend.app.models.deal import DealAnalysis
+from backend.app.models.economics import EconomicsEvaluationRequest, EconomicsEvaluationResponse
 from backend.app.models.intelligence import (
     DealDocument,
     DealIntelligenceResponse,
@@ -24,6 +25,7 @@ from backend.app.services.commercial_intelligence import SourceDocument, derive_
 from backend.app.services.scenario_generation import generate_stress_scenarios
 from backend.app.services.term_extraction import extract_commercial_terms
 from backend.app.simulation.engine import evaluate_deal
+from backend.app.simulation.economics import evaluate_financial_scenario
 
 router = APIRouter()
 
@@ -177,6 +179,13 @@ def update_effective_term(deal_id: int, term_id: int, payload: ManualTermEditReq
         ),
     )
     return ManualTermEditResponse(term=_row_to_effective_term(updated))
+
+
+@router.post("/economics/evaluate", response_model=EconomicsEvaluationResponse)
+def evaluate_economics(payload: EconomicsEvaluationRequest) -> EconomicsEvaluationResponse:
+    return EconomicsEvaluationResponse(
+        result=evaluate_financial_scenario(payload.terms, payload.assumptions, payload.scenario)
+    )
 
 
 def _analyze_contract_text(text: str, filename: str | None) -> ContractAnalysisResponse:
