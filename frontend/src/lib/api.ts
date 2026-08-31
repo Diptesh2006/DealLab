@@ -182,9 +182,24 @@ export type DealHealthSummary = {
   calculation_config: DealHealthConfig;
 };
 
+export type FailureMode = {
+  title: string;
+  affected_clause: string;
+  scenario: string;
+  why_it_fails: string;
+  financial_impact: number;
+  formatted_financial_impact: string;
+  severity: "warning" | "critical";
+  confidence: number;
+  original_source: string;
+  recommended_remediation_category: string;
+  explanation: string;
+};
+
 export type StressTestResponse = {
   health: DealHealthSummary;
   scenarios: ScenarioStressResult[];
+  failure_modes: FailureMode[];
 };
 
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";

@@ -3,6 +3,19 @@
 import { FileText, Loader2, Save, Send, Upload } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ReferenceLine,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import {
   analyzeDeal,
@@ -354,7 +367,7 @@ export function DealAnalyzer() {
             </div>
 
             {economics ? <EconomicsResult result={economics} /> : null}
-            {stressTest ? <StressTestResult result={stressTest} /> : null}
+            {stressTest ? <StressTestResult result={stressTest} deal={deal} /> : null}
           </div>
         ) : null}
       </div>
@@ -459,49 +472,141 @@ function EconomicsResult({ result }: { result: ScenarioEconomicsResult }) {
   );
 }
 
-function StressTestResult({ result }: { result: StressTestResponse }) {
+function StressTestResult({ result, deal }: { result: StressTestResponse; deal: DealIntelligenceResponse | null }) {
+  const currency = result.scenarios[0]?.economics.currency ?? "USD";
+  const chartData = result.scenarios.map((item) => ({
+    name: item.scenario.name,
+    margin: item.economics.gross_margin_percent,
+    exposure: item.economics.downside_exposure,
+    status: item.status,
+  }));
+
   return (
-    <div className="mt-6 rounded-md border border-ink/10 bg-white">
-      <div className="border-b border-ink/10 p-4">
-        <p className="text-sm font-medium uppercase tracking-wide text-steel">Deal health</p>
-        <div className="mt-3 grid gap-3 md:grid-cols-4">
-          <SummaryMetric label="Rating" value={result.health.rating} />
-          <SummaryMetric label="Above target" value={`${result.health.percentage_above_target_margin}%`} />
-          <SummaryMetric label="Worst margin" value={`${result.health.worst_case_margin}%`} />
-          <SummaryMetric label="Annual exposure" value={result.health.estimated_annual_exposure} currency={result.scenarios[0]?.economics.currency} />
+    <div className="mt-6 space-y-5">
+      <section className="rounded-md border border-ink/10 bg-ink p-5 text-white">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-mint">Deal Health</p>
+            <h2 className="mt-1 text-2xl font-semibold">
+              {deal ? `${deal.customer_name} ${deal.deal_name}` : "Enterprise Contract"}
+            </h2>
+            <p className="mt-3 text-sm uppercase tracking-wide text-white/70">Status</p>
+            <p className="text-2xl font-semibold uppercase text-amber">{result.health.rating}</p>
+          </div>
+          <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            <HealthStat label="ARR" value={formatCompactMoney(result.scenarios.find((item) => item.scenario.name === "Expected adoption")?.economics.arr ?? 0, currency)} />
+            <HealthStat label="Target Gross Margin" value={`${result.health.calculation_config.target_margin_percent}%`} />
+            <HealthStat label="Expected Margin" value={`${result.health.expected_scenario_margin}%`} />
+            <HealthStat label="Downside Margin" value={`${result.health.downside_margin}%`} />
+            <HealthStat label="Scenarios Healthy" value={`${result.health.percentage_above_target_margin}%`} />
+            <HealthStat label="Annual Value at Risk" value={formatCompactMoney(result.health.estimated_annual_exposure, currency)} />
+          </div>
         </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-4">
-          <SummaryMetric label="Expected margin" value={`${result.health.expected_scenario_margin}%`} />
-          <SummaryMetric label="Downside margin" value={`${result.health.downside_margin}%`} />
-          <SummaryMetric label="Critical scenarios" value={result.health.critical_scenarios} />
-          <SummaryMetric label="Warning scenarios" value={result.health.warning_scenarios} />
-        </div>
-        <p className="mt-3 text-xs leading-5 text-steel">
+        <p className="mt-4 text-xs leading-5 text-white/65">
           Rating uses configurable thresholds: target margin {result.health.calculation_config.target_margin_percent}%,
           warning gap {result.health.calculation_config.warning_margin_gap_percent}%, critical gap{" "}
           {result.health.calculation_config.critical_margin_gap_percent}%.
         </p>
-      </div>
+      </section>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1120px] text-left text-sm">
-          <thead className="bg-ink/5 text-xs uppercase tracking-wide text-steel">
-            <tr>
-              <th className="px-3 py-3">Scenario</th>
-              <th className="px-3 py-3">Variables</th>
-              <th className="px-3 py-3">Sources</th>
-              <th className="px-3 py-3">Margin</th>
-              <th className="px-3 py-3">Exposure</th>
-              <th className="px-3 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.scenarios.map((item) => (
-              <StressScenarioRow key={item.scenario.name} item={item} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <section className="grid gap-5 xl:grid-cols-[1fr_0.8fr]">
+        <div className="rounded-md border border-ink/10 bg-white p-4">
+          <p className="text-sm font-medium uppercase tracking-wide text-steel">Scenario outcome chart</p>
+          <div className="mt-3 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={70} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <ReferenceLine y={result.health.calculation_config.target_margin_percent} stroke="#17202a" strokeDasharray="4 4" />
+                <Bar dataKey="margin" name="Gross margin %">
+                  {chartData.map((item) => (
+                    <Cell key={item.name} fill={statusColor(item.status)} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-ink/10 bg-white p-4">
+          <p className="text-sm font-medium uppercase tracking-wide text-steel">Margin distribution</p>
+          <div className="mt-3 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="margin" name="Margin %" tick={{ fontSize: 11 }} />
+                <YAxis dataKey="exposure" name="Exposure" tick={{ fontSize: 11 }} />
+                <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+                <ReferenceLine x={result.health.calculation_config.target_margin_percent} stroke="#17202a" strokeDasharray="4 4" />
+                <Scatter data={chartData} fill="#2fbf9b" />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        {result.failure_modes.map((mode) => (
+          <article key={`${mode.title}-${mode.scenario}`} className="rounded-md border border-ink/10 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-steel">{mode.scenario}</p>
+                <h3 className="mt-1 text-lg font-semibold text-ink">{mode.title}</h3>
+              </div>
+              <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${mode.severity === "critical" ? "border-red-300 bg-red-50 text-red-900" : "border-amber/50 bg-amber/10 text-ink"}`}>
+                {mode.severity}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <SummaryMetric label="Impact" value={mode.financial_impact} currency={currency} />
+              <SummaryMetric label="Confidence" value={`${Math.round(mode.confidence * 100)}%`} />
+              <SummaryMetric label="Source" value={mode.original_source} />
+            </div>
+            <dl className="mt-4 grid gap-3 text-sm">
+              <div>
+                <dt className="font-semibold text-steel">Affected clause</dt>
+                <dd className="text-ink">{mode.affected_clause}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-steel">Why it fails</dt>
+                <dd className="text-ink">{mode.why_it_fails}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-steel">Recommended remediation</dt>
+                <dd className="text-ink">{mode.recommended_remediation_category}</dd>
+              </div>
+            </dl>
+            <p className="mt-4 rounded-md bg-paper p-3 text-sm leading-6 text-ink">{mode.explanation}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="rounded-md border border-ink/10 bg-white">
+        <div className="border-b border-ink/10 p-4">
+          <p className="text-sm font-medium uppercase tracking-wide text-steel">Scenario comparison</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1120px] text-left text-sm">
+            <thead className="bg-ink/5 text-xs uppercase tracking-wide text-steel">
+              <tr>
+                <th className="px-3 py-3">Scenario</th>
+                <th className="px-3 py-3">Variables</th>
+                <th className="px-3 py-3">Sources</th>
+                <th className="px-3 py-3">Margin</th>
+                <th className="px-3 py-3">Exposure</th>
+                <th className="px-3 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.scenarios.map((item) => (
+                <StressScenarioRow key={item.scenario.name} item={item} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
@@ -580,6 +685,21 @@ function SummaryMetric({
   );
 }
 
+function HealthStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-white/55">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function statusColor(status: ScenarioStressResult["status"]) {
+  if (status === "critical") return "#dc2626";
+  if (status === "warning") return "#d9972b";
+  return "#2fbf9b";
+}
+
 function toEditableTerm(term: EffectiveTerm): EditableTerm {
   return {
     ...term,
@@ -614,5 +734,20 @@ function formatMoney(value: number, currency: string) {
     style: "currency",
     currency,
     maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatCompactMoney(value: number, currency: string) {
+  if (currency === "INR") {
+    const absolute = Math.abs(value);
+    if (absolute >= 10000000) return `${value < 0 ? "-" : ""}₹${(absolute / 10000000).toFixed(1)}Cr`;
+    if (absolute >= 100000) return `${value < 0 ? "-" : ""}₹${(absolute / 100000).toFixed(1)}L`;
+  }
+
+  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
   }).format(value);
 }
