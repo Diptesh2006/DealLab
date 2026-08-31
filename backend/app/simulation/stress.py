@@ -1,3 +1,5 @@
+import re
+
 from backend.app.models.economics import CompanyAssumptions, EconomicScenarioInput
 from backend.app.models.intelligence import EffectiveTerm
 from backend.app.models.stress import (
@@ -47,7 +49,7 @@ def generate_stress_scenarios(
     expected_usage_revenue: float,
 ) -> list[StressScenario]:
     term_map = {term.field_name: term for term in terms}
-    support_hours = assumptions.typical_support_consumption_hours
+    support_hours = _effective_support_hours(term_map, assumptions.typical_support_consumption_hours)
 
     return [
         _scenario(
@@ -325,6 +327,21 @@ def _support_events(term_map: dict[str, EffectiveTerm], defaults: list[str]) -> 
     if _has_unlimited_support(term_map):
         return defaults + ["unlimited support clause detected"]
     return defaults
+
+
+def _effective_support_hours(term_map: dict[str, EffectiveTerm], default_hours: float) -> float:
+    allowance = term_map.get("support_allowance")
+    if not allowance:
+        return default_hours
+    value = allowance.normalized_value.lower()
+    if "unlimited" in value:
+        return default_hours
+    numbers = [float(match) for match in re.findall(r"[0-9]+(?:\.[0-9]+)?", value)]
+    if not numbers:
+        return default_hours
+    cap = numbers[0]
+    annual_cap = cap * 12 if "month" in value else cap
+    return min(default_hours, annual_cap)
 
 
 def _rank_failure_modes(

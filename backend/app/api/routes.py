@@ -19,7 +19,9 @@ from backend.app.models.intelligence import (
     ManualTermEditResponse,
     ReviewStatus,
 )
+from backend.app.models.optimization import OptimizeDealRequest, OptimizeDealResponse
 from backend.app.models.stress import StressTestRequest, StressTestResponse
+from backend.app.optimization.deal_optimizer import optimize_deal
 from backend.app.optimization.engine import health_score, identify_fragile_terms, recommend_changes
 from backend.app.services.contract_ingestion import extract_text_from_pdf, normalize_contract_text
 from backend.app.services.commercial_intelligence import SourceDocument, derive_effective_terms
@@ -198,6 +200,17 @@ def evaluate_stress_test(payload: StressTestRequest) -> StressTestResponse:
         expected_usage_units=payload.expected_usage_units,
         expected_usage_revenue=payload.expected_usage_revenue,
         health_config=payload.health_config,
+    )
+
+
+@router.post("/deals/optimize", response_model=OptimizeDealResponse)
+def optimize_deal_terms(payload: OptimizeDealRequest) -> OptimizeDealResponse:
+    return optimize_deal(
+        terms=payload.terms,
+        assumptions=payload.assumptions,
+        expected_usage_units=payload.expected_usage_units,
+        expected_usage_revenue=payload.expected_usage_revenue,
+        max_changed_clauses=payload.max_changed_clauses,
     )
 
 
