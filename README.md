@@ -67,6 +67,8 @@ The frontend calls `GET http://localhost:8000/api/health` and displays live back
 
 - `GET /api/health`: verifies service and database readiness.
 - `POST /api/contracts/analyze-text`: stores contract text, extracts commercial terms, runs deterministic stress scenarios, records an audit event, and returns deal health.
+- `POST /api/economics/evaluate`: evaluates one reviewed scenario through deterministic Python formulas.
+- `POST /api/stress-tests/evaluate`: generates the default stress-test scenario set, evaluates each scenario through the deterministic economics engine, and returns deal health.
 
 Example:
 
@@ -79,3 +81,19 @@ curl -X POST http://localhost:8000/api/contracts/analyze-text \
 ## Architecture Principle
 
 LLMs may interpret language, identify ambiguity, propose scenarios, explain risk, and recommend alternative structures. They must not perform core financial arithmetic. The deterministic simulation engine owns revenue, cost, margin, downside exposure, thresholds, scoring, and comparisons.
+
+## Stress-Test Health Rating
+
+The MVP generates ten plausible commercial scenarios: conservative adoption, expected adoption, high adoption, support-heavy customer, infrastructure-cost increase, renewal, discount expiry, SLA degradation, high adoption plus high support, and downside commercial scenario.
+
+Each scenario includes usage multiplier, support hours, cost multiplier, renewal year, discount state, SLA performance, customer growth rate, commercial events, and source labels. Synthetic historical data is labeled as `synthetic historical benchmark`.
+
+Health scoring is configurable through `DealHealthConfig`:
+
+- Scenario passes when gross margin is at or above `target_margin_percent`.
+- Scenario is a warning when it is below target but less than `critical_margin_gap_percent` below target.
+- Scenario is critical when it is at least `critical_margin_gap_percent` below target.
+- `Healthy`: pass rate >= `healthy_min_pass_rate`, no critical scenarios, and worst margin no more than `warning_margin_gap_percent` below target.
+- `Mostly Healthy`: pass rate >= `mostly_healthy_min_pass_rate` and at most one critical scenario.
+- `Commercially Fragile`: pass rate >= `fragile_min_pass_rate`.
+- `High Risk`: anything below the fragile threshold.

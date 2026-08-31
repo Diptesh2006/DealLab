@@ -90,6 +90,7 @@ export type EconomicScenarioInput = {
   expected_usage_units: number;
   usage_revenue: number;
   support_hours?: number | null;
+  cost_multiplier?: number;
   apply_temporary_discount: boolean;
   apply_service_credits: boolean;
   apply_rebates: boolean;
@@ -123,6 +124,67 @@ export type ScenarioEconomicsResult = {
   downside_exposure: number;
   difference_from_target_margin: number;
   breakdown: FinancialLineItem[];
+};
+
+export type ScenarioSourceLabel =
+  | "user-entered assumption"
+  | "historical benchmark"
+  | "synthetic historical benchmark"
+  | "contract-derived"
+  | "AI-proposed hypothetical"
+  | "system default";
+
+export type ScenarioAssumptionSource = {
+  variable: string;
+  label: ScenarioSourceLabel;
+  detail: string;
+};
+
+export type StressScenario = {
+  name: string;
+  description: string;
+  usage_multiplier: number;
+  support_hours: number;
+  cost_multiplier: number;
+  renewal_year: number;
+  discount_state: string;
+  sla_performance_percent: number | null;
+  customer_growth_rate: number;
+  relevant_commercial_events: string[];
+  sources: ScenarioAssumptionSource[];
+  economics_input: EconomicScenarioInput;
+};
+
+export type ScenarioStressResult = {
+  scenario: StressScenario;
+  economics: ScenarioEconomicsResult;
+  status: "pass" | "warning" | "critical";
+};
+
+export type DealHealthConfig = {
+  target_margin_percent: number;
+  warning_margin_gap_percent: number;
+  critical_margin_gap_percent: number;
+  healthy_min_pass_rate: number;
+  mostly_healthy_min_pass_rate: number;
+  fragile_min_pass_rate: number;
+};
+
+export type DealHealthSummary = {
+  rating: "Healthy" | "Mostly Healthy" | "Commercially Fragile" | "High Risk";
+  percentage_above_target_margin: number;
+  expected_scenario_margin: number;
+  downside_margin: number;
+  worst_case_margin: number;
+  estimated_annual_exposure: number;
+  critical_scenarios: number;
+  warning_scenarios: number;
+  calculation_config: DealHealthConfig;
+};
+
+export type StressTestResponse = {
+  health: DealHealthSummary;
+  scenarios: ScenarioStressResult[];
 };
 
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -206,4 +268,26 @@ export async function evaluateEconomics(payload: {
 
   const result = await response.json();
   return result.result;
+}
+
+export async function evaluateStressTest(payload: {
+  terms: EffectiveTerm[];
+  assumptions: CompanyAssumptions;
+  expected_usage_units: number;
+  expected_usage_revenue: number;
+  health_config?: Partial<DealHealthConfig>;
+}): Promise<StressTestResponse> {
+  const response = await fetch(`${baseUrl}/api/stress-tests/evaluate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Stress test failed: ${response.status}`);
+  }
+
+  return response.json();
 }

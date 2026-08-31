@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import {
   analyzeDeal,
   evaluateEconomics,
+  evaluateStressTest,
   updateEffectiveTerm,
   type CompanyAssumptions,
   type DealIntelligenceResponse,
@@ -14,6 +15,8 @@ import {
   type EffectiveTerm,
   type ReviewStatus,
   type ScenarioEconomicsResult,
+  type ScenarioStressResult,
+  type StressTestResponse,
 } from "@/lib/api";
 
 type EditableTerm = EffectiveTerm & {
@@ -59,9 +62,11 @@ export function DealAnalyzer() {
     renewal_number: 1,
   });
   const [economics, setEconomics] = useState<ScenarioEconomicsResult | null>(null);
+  const [stressTest, setStressTest] = useState<StressTestResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [isStressTesting, setIsStressTesting] = useState(false);
 
   const unresolvedCount = useMemo(
     () => terms.filter((term) => term.review_status === "requires_human_review" || term.ambiguous).length,
@@ -91,6 +96,7 @@ export function DealAnalyzer() {
       setDeal(result);
       setTerms(result.effective_terms.map(toEditableTerm));
       setEconomics(null);
+      setStressTest(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deal analysis failed");
     } finally {
@@ -131,6 +137,29 @@ export function DealAnalyzer() {
       setError(err instanceof Error ? err.message : "Economics evaluation failed");
     } finally {
       setIsEvaluating(false);
+    }
+  }
+
+  async function runStressTest() {
+    if (!terms.length) return;
+
+    setIsStressTesting(true);
+    setError(null);
+    try {
+      const result = await evaluateStressTest({
+        terms: terms.map(fromEditableTerm),
+        assumptions,
+        expected_usage_units: scenario.expected_usage_units,
+        expected_usage_revenue: scenario.usage_revenue,
+        health_config: {
+          target_margin_percent: assumptions.minimum_acceptable_gross_margin,
+        },
+      });
+      setStressTest(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Stress test failed");
+    } finally {
+      setIsStressTesting(false);
     }
   }
 
@@ -313,10 +342,19 @@ export function DealAnalyzer() {
                   {isEvaluating ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
                   Calculate Economics
                 </button>
+                <button
+                  className="ml-2 mt-4 inline-flex items-center gap-2 rounded-md bg-amber px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                  onClick={runStressTest}
+                  disabled={isStressTesting}
+                >
+                  {isStressTesting ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+                  Run Stress Test
+                </button>
               </div>
             </div>
 
             {economics ? <EconomicsResult result={economics} /> : null}
+            {stressTest ? <StressTestResult result={stressTest} /> : null}
           </div>
         ) : null}
       </div>
@@ -421,6 +459,104 @@ function EconomicsResult({ result }: { result: ScenarioEconomicsResult }) {
   );
 }
 
+function StressTestResult({ result }: { result: StressTestResponse }) {
+  return (
+    <div className="mt-6 rounded-md border border-ink/10 bg-white">
+      <div className="border-b border-ink/10 p-4">
+        <p className="text-sm font-medium uppercase tracking-wide text-steel">Deal health</p>
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <SummaryMetric label="Rating" value={result.health.rating} />
+          <SummaryMetric label="Above target" value={`${result.health.percentage_above_target_margin}%`} />
+          <SummaryMetric label="Worst margin" value={`${result.health.worst_case_margin}%`} />
+          <SummaryMetric label="Annual exposure" value={result.health.estimated_annual_exposure} currency={result.scenarios[0]?.economics.currency} />
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <SummaryMetric label="Expected margin" value={`${result.health.expected_scenario_margin}%`} />
+          <SummaryMetric label="Downside margin" value={`${result.health.downside_margin}%`} />
+          <SummaryMetric label="Critical scenarios" value={result.health.critical_scenarios} />
+          <SummaryMetric label="Warning scenarios" value={result.health.warning_scenarios} />
+        </div>
+        <p className="mt-3 text-xs leading-5 text-steel">
+          Rating uses configurable thresholds: target margin {result.health.calculation_config.target_margin_percent}%,
+          warning gap {result.health.calculation_config.warning_margin_gap_percent}%, critical gap{" "}
+          {result.health.calculation_config.critical_margin_gap_percent}%.
+        </p>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1120px] text-left text-sm">
+          <thead className="bg-ink/5 text-xs uppercase tracking-wide text-steel">
+            <tr>
+              <th className="px-3 py-3">Scenario</th>
+              <th className="px-3 py-3">Variables</th>
+              <th className="px-3 py-3">Sources</th>
+              <th className="px-3 py-3">Margin</th>
+              <th className="px-3 py-3">Exposure</th>
+              <th className="px-3 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.scenarios.map((item) => (
+              <StressScenarioRow key={item.scenario.name} item={item} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StressScenarioRow({ item }: { item: ScenarioStressResult }) {
+  const statusClass = {
+    pass: "border-mint/40 bg-mint/10 text-ink",
+    warning: "border-amber/50 bg-amber/10 text-ink",
+    critical: "border-red-300 bg-red-50 text-red-900",
+  }[item.status];
+
+  return (
+    <tr className="border-t border-ink/10 align-top">
+      <td className="px-3 py-3">
+        <details>
+          <summary className="cursor-pointer font-semibold text-ink">{item.scenario.name}</summary>
+          <p className="mt-2 max-w-72 text-xs leading-5 text-steel">{item.scenario.description}</p>
+          <div className="mt-2 rounded-md bg-paper p-2 text-xs text-steel">
+            {item.economics.breakdown.map((line) => (
+              <div key={line.label} className="flex justify-between gap-3 py-0.5">
+                <span>{line.label}</span>
+                <span className="font-medium text-ink">{line.formatted_amount}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      </td>
+      <td className="px-3 py-3 text-xs leading-5 text-steel">
+        <p>Usage x{item.scenario.usage_multiplier}</p>
+        <p>Support {item.scenario.support_hours}h</p>
+        <p>Cost x{item.scenario.cost_multiplier}</p>
+        <p>Renewal year {item.scenario.renewal_year}</p>
+        <p>SLA {item.scenario.sla_performance_percent ?? "-"}%</p>
+        <p>Growth {Math.round(item.scenario.customer_growth_rate * 100)}%</p>
+        <p>{item.scenario.discount_state}</p>
+      </td>
+      <td className="px-3 py-3">
+        <div className="flex max-w-72 flex-wrap gap-1">
+          {item.scenario.sources.map((source) => (
+            <span key={`${source.variable}-${source.label}`} title={source.detail} className="rounded-md border border-ink/10 bg-paper px-2 py-1 text-xs text-steel">
+              {source.label}
+            </span>
+          ))}
+        </div>
+        <p className="mt-2 max-w-72 text-xs text-steel">{item.scenario.relevant_commercial_events.join(", ")}</p>
+      </td>
+      <td className="px-3 py-3 font-semibold text-ink">{item.economics.gross_margin_percent}%</td>
+      <td className="px-3 py-3 text-ink">{formatMoney(item.economics.downside_exposure, item.economics.currency)}</td>
+      <td className="px-3 py-3">
+        <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${statusClass}`}>{item.status}</span>
+      </td>
+    </tr>
+  );
+}
+
 function SummaryMetric({
   label,
   value,
@@ -471,4 +607,12 @@ function updateDraft(
 
 function humanize(value: string) {
   return value.replaceAll("_", " ");
+}
+
+function formatMoney(value: number, currency: string) {
+  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
