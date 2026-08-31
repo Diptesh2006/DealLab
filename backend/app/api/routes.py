@@ -19,9 +19,14 @@ from backend.app.models.intelligence import (
     ManualTermEditResponse,
     ReviewStatus,
 )
-from backend.app.models.optimization import OptimizeDealRequest, OptimizeDealResponse
+from backend.app.models.optimization import (
+    OptimizeDealRequest,
+    OptimizeDealResponse,
+    PrepareRevisedTermsRequest,
+    PrepareRevisedTermsResponse,
+)
 from backend.app.models.stress import StressTestRequest, StressTestResponse
-from backend.app.optimization.deal_optimizer import optimize_deal
+from backend.app.optimization.deal_optimizer import optimize_deal, prepare_revised_terms
 from backend.app.optimization.engine import health_score, identify_fragile_terms, recommend_changes
 from backend.app.services.contract_ingestion import extract_text_from_pdf, normalize_contract_text
 from backend.app.services.commercial_intelligence import SourceDocument, derive_effective_terms
@@ -212,6 +217,11 @@ def optimize_deal_terms(payload: OptimizeDealRequest) -> OptimizeDealResponse:
         expected_usage_revenue=payload.expected_usage_revenue,
         max_changed_clauses=payload.max_changed_clauses,
     )
+
+
+@router.post("/deals/prepare-revised-terms", response_model=PrepareRevisedTermsResponse)
+def prepare_revised_terms_artifact(payload: PrepareRevisedTermsRequest) -> PrepareRevisedTermsResponse:
+    return prepare_revised_terms(payload.option)
 
 
 def _analyze_contract_text(text: str, filename: str | None) -> ContractAnalysisResponse:

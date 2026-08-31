@@ -1,6 +1,6 @@
 from backend.app.models.economics import CompanyAssumptions
 from backend.app.models.intelligence import EffectiveTerm, ExtractionType, ReviewStatus
-from backend.app.optimization.deal_optimizer import optimize_deal
+from backend.app.optimization.deal_optimizer import optimize_deal, prepare_revised_terms
 
 
 def test_optimizer_returns_ranked_options_that_improve_health():
@@ -13,6 +13,16 @@ def test_optimizer_returns_ranked_options_that_improve_health():
     assert top.reasons_for_recommendation
     assert top.customer_impact
     assert top.score >= response.options[-1].score
+    assert top.trust_traces
+    assert top.trust_traces[0].contract_evidence
+    assert top.trust_traces[0].deterministic_calculation
+    assert top.trust_traces[0].ai_reasoning_status in {
+        "confirmed",
+        "inferred",
+        "requires_assumption",
+        "requires_human_review",
+        "assumption",
+    }
 
 
 def test_optimizer_can_add_structural_support_change_without_price_increase():
@@ -21,6 +31,19 @@ def test_optimizer_can_add_structural_support_change_without_price_increase():
     fields = {change.field_name for option in response.options for change in option.changed_terms}
     assert "support_allowance" in fields
     assert any("No base price increase" in option.customer_impact for option in response.options)
+
+
+def test_prepare_revised_terms_is_structured_and_requires_approval():
+    response = optimize_deal(terms(include_unlimited_support=True), assumptions(), 1_200_000, 240_000, max_changed_clauses=2)
+    artifact = prepare_revised_terms(response.options[0])
+
+    assert artifact.subject_to_human_approval is True
+    assert artifact.workflow_status == "Approved Recommendation"
+    assert artifact.revised_terms
+    assert artifact.revised_terms[0].current
+    assert artifact.revised_terms[0].proposed
+    assert "Healthy scenarios" in artifact.revised_terms[0].expected_effect
+    assert "has not modified or signed" in artifact.approval_note
 
 
 def assumptions() -> CompanyAssumptions:
