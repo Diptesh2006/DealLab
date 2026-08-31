@@ -63,6 +63,20 @@ class DealHealthSummary(BaseModel):
     calculation_config: DealHealthConfig
 
 
+class FailureMode(BaseModel):
+    title: str
+    affected_clause: str
+    scenario: str
+    why_it_fails: str
+    financial_impact: float
+    formatted_financial_impact: str
+    severity: str
+    confidence: float = Field(ge=0, le=1)
+    original_source: str
+    recommended_remediation_category: str
+    explanation: str
+
+
 class StressTestRequest(BaseModel):
     terms: list[EffectiveTerm]
     assumptions: CompanyAssumptions
@@ -74,3 +88,4 @@ class StressTestRequest(BaseModel):
 class StressTestResponse(BaseModel):
     health: DealHealthSummary
     scenarios: list[ScenarioStressResult]
+    failure_modes: list[FailureMode]

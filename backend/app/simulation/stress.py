@@ -3,13 +3,14 @@ from backend.app.models.intelligence import EffectiveTerm
 from backend.app.models.stress import (
     DealHealthConfig,
     DealHealthSummary,
+    FailureMode,
     ScenarioAssumptionSource,
     ScenarioSourceLabel,
     ScenarioStressResult,
     StressScenario,
     StressTestResponse,
 )
-from backend.app.simulation.economics import evaluate_financial_scenario
+from backend.app.simulation.economics import evaluate_financial_scenario, format_currency
 
 
 def run_stress_test(
@@ -32,7 +33,11 @@ def run_stress_test(
             )
         )
 
-    return StressTestResponse(health=_summarize_health(results, config), scenarios=results)
+    return StressTestResponse(
+        health=_summarize_health(results, config),
+        scenarios=results,
+        failure_modes=_rank_failure_modes(terms, results, config),
+    )
 
 
 def generate_stress_scenarios(
@@ -320,3 +325,181 @@ def _support_events(term_map: dict[str, EffectiveTerm], defaults: list[str]) -> 
     if _has_unlimited_support(term_map):
         return defaults + ["unlimited support clause detected"]
     return defaults
+
+
+def _rank_failure_modes(
+    terms: list[EffectiveTerm],
+    results: list[ScenarioStressResult],
+    config: DealHealthConfig,
+) -> list[FailureMode]:
+    term_map = {term.field_name: term for term in terms}
+    currency = results[0].economics.currency if results else _term_value(term_map, "currency", "USD")
+    modes: list[FailureMode] = []
+
+    for result in results:
+        if result.economics.downside_exposure <= 0:
+            continue
+        if "High adoption" in result.scenario.name:
+            modes.append(
+                _failure(
+                    "High Adoption Becomes Unprofitable",
+                    "included_usage / overage_pricing / maximum_usage_payment_cap",
+                    result,
+                    "Usage grows faster than recoverable overage revenue.",
+                    "Reprice overage or raise/remove usage cap",
+                    term_map,
+                    currency,
+                    config,
+                    contract_detail=_usage_contract_detail(term_map),
+                )
+            )
+        elif "Support-heavy" in result.scenario.name:
+            modes.append(
+                _failure(
+                    "Support Load Consumes Deal Margin",
+                    "support_allowance / support_pricing",
+                    result,
+                    "Support hours rise while contract recovery does not scale with service load.",
+                    "Add support allowance limits or paid tiers",
+                    term_map,
+                    currency,
+                    config,
+                    contract_detail=_support_contract_detail(term_map),
+                )
+            )
+        elif "Infrastructure-cost" in result.scenario.name:
+            modes.append(
+                _failure(
+                    "Infrastructure Inflation Outruns Pricing",
+                    "renewal_escalation / overage_pricing",
+                    result,
+                    "Cost multiplier increases total delivery cost without matching price protection.",
+                    "Add cost-indexed uplift or usage-based pricing floor",
+                    term_map,
+                    currency,
+                    config,
+                    contract_detail=_cost_contract_detail(term_map),
+                )
+            )
+        elif "SLA" in result.scenario.name:
+            modes.append(
+                _failure(
+                    "Service Credits Amplify Downside",
+                    "sla_threshold / service_credits",
+                    result,
+                    "Lower SLA performance triggers credits while support and infrastructure costs rise.",
+                    "Narrow credit triggers and cap monthly service credits",
+                    term_map,
+                    currency,
+                    config,
+                    contract_detail=_sla_contract_detail(term_map),
+                )
+            )
+        elif "Downside" in result.scenario.name:
+            modes.append(
+                _failure(
+                    "Combined Downside Breaks Guardrails",
+                    "discounts / rebates / service credits / support obligations",
+                    result,
+                    "Multiple concessions stack in the same scenario and push margin below target.",
+                    "Reduce concession stacking and add minimum commitment",
+                    term_map,
+                    currency,
+                    config,
+                    contract_detail="Contract term: discounts, rebates, credits, and support costs are evaluated together.",
+                )
+            )
+        else:
+            modes.append(
+                _failure(
+                    f"{result.scenario.name} Falls Below Target",
+                    "commercial pricing and cost assumptions",
+                    result,
+                    "The scenario gross profit does not meet the configured target margin.",
+                    "Review price, discount, and cost assumption package",
+                    term_map,
+                    currency,
+                    config,
+                    contract_detail="Contract term: scenario margin is below the configured target.",
+                )
+            )
+
+    return sorted(modes, key=lambda item: item.financial_impact, reverse=True)[:5]
+
+
+def _failure(
+    title: str,
+    affected_clause: str,
+    result: ScenarioStressResult,
+    why_it_fails: str,
+    remediation: str,
+    term_map: dict[str, EffectiveTerm],
+    currency: str,
+    config: DealHealthConfig,
+    contract_detail: str,
+) -> FailureMode:
+    impact = result.economics.downside_exposure
+    severity = "critical" if result.status == "critical" else "warning"
+    source = _source_for_clause(term_map, affected_clause)
+    calculation = (
+        f"scenario margin {result.economics.gross_margin_percent}% vs target "
+        f"{config.target_margin_percent}%, creating {format_currency(impact, currency)} annual exposure"
+    )
+    return FailureMode(
+        title=title,
+        affected_clause=affected_clause,
+        scenario=result.scenario.name,
+        why_it_fails=why_it_fails,
+        financial_impact=round(impact, 2),
+        formatted_financial_impact=format_currency(impact, currency),
+        severity=severity,
+        confidence=0.86 if source != "requires_human_review" else 0.68,
+        original_source=source,
+        recommended_remediation_category=remediation,
+        explanation=(
+            f"{contract_detail} In {result.scenario.name}, {why_it_fails.lower()} "
+            f"The deterministic calculation shows {calculation}. "
+            "The consequence is reduced downside protection before signature."
+        ),
+    )
+
+
+def _source_for_clause(term_map: dict[str, EffectiveTerm], affected_clause: str) -> str:
+    for field_name in affected_clause.replace("/", " ").split():
+        term = term_map.get(field_name)
+        if term and term.source_document:
+            page = f", page {term.source_page}" if term.source_page else ""
+            return f"{term.source_document}{page}"
+    return "requires_human_review"
+
+
+def _usage_contract_detail(term_map: dict[str, EffectiveTerm]) -> str:
+    included = _term_value(term_map, "included_usage", "unknown")
+    overage = _term_value(term_map, "overage_pricing", "unknown")
+    cap = _term_value(term_map, "maximum_usage_payment_cap", "unknown")
+    return f"Contract term: {included} usage included, overage price {overage}, payment cap {cap}."
+
+
+def _support_contract_detail(term_map: dict[str, EffectiveTerm]) -> str:
+    allowance = _term_value(term_map, "support_allowance", "unknown")
+    pricing = _term_value(term_map, "support_pricing", "unknown")
+    return f"Contract term: support allowance {allowance}, support pricing {pricing}."
+
+
+def _cost_contract_detail(term_map: dict[str, EffectiveTerm]) -> str:
+    escalation = _term_value(term_map, "renewal_escalation", "unknown")
+    overage = _term_value(term_map, "overage_pricing", "unknown")
+    return f"Contract term: renewal escalation {escalation}, overage price {overage}."
+
+
+def _sla_contract_detail(term_map: dict[str, EffectiveTerm]) -> str:
+    threshold = _term_value(term_map, "sla_threshold", "unknown")
+    credits = _term_value(term_map, "service_credits", "unknown")
+    return f"Contract term: SLA threshold {threshold}, service credits {credits}."
+
+
+def _term_value(term_map: dict[str, EffectiveTerm], field_name: str, default: str) -> str:
+    term = term_map.get(field_name)
+    if not term or term.normalized_value == "unknown":
+        return default
+    return term.normalized_value

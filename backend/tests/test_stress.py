@@ -37,10 +37,25 @@ def test_stress_test_evaluates_all_scenarios_and_summarizes_health():
     response = run_stress_test(terms(), assumptions(), 1_200_000, 240_000)
 
     assert len(response.scenarios) == 10
+    assert response.failure_modes
+    assert response.failure_modes[0].financial_impact >= response.failure_modes[-1].financial_impact
     assert response.health.rating in {"Healthy", "Mostly Healthy", "Commercially Fragile", "High Risk"}
     assert response.health.worst_case_margin <= response.health.expected_scenario_margin
     assert response.health.estimated_annual_exposure >= 0
     assert response.health.calculation_config.target_margin_percent == 45
+
+
+def test_failure_modes_connect_clause_scenario_calculation_and_consequence():
+    response = run_stress_test(terms(include_support_cap=True), assumptions(), 1_200_000, 240_000)
+    mode = response.failure_modes[0]
+
+    assert mode.affected_clause
+    assert mode.scenario
+    assert mode.formatted_financial_impact
+    assert mode.recommended_remediation_category
+    assert "Contract term:" in mode.explanation
+    assert "deterministic calculation" in mode.explanation
+    assert "consequence" in mode.explanation
 
 
 def assumptions() -> CompanyAssumptions:
