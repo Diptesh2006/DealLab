@@ -69,6 +69,7 @@ The frontend calls `GET http://localhost:8000/api/health` and displays live back
 - `POST /api/contracts/analyze-text`: stores contract text, extracts commercial terms, runs deterministic stress scenarios, records an audit event, and returns deal health.
 - `POST /api/economics/evaluate`: evaluates one reviewed scenario through deterministic Python formulas.
 - `POST /api/stress-tests/evaluate`: generates the default stress-test scenario set, evaluates each scenario through the deterministic economics engine, and returns deal health.
+- `POST /api/deals/optimize`: creates bounded commercial change candidates, evaluates combinations through the stress-test engine, and returns ranked optimization options.
 
 Example:
 
@@ -97,3 +98,13 @@ Health scoring is configurable through `DealHealthConfig`:
 - `Mostly Healthy`: pass rate >= `mostly_healthy_min_pass_rate` and at most one critical scenario.
 - `Commercially Fragile`: pass rate >= `fragile_min_pass_rate`.
 - `High Risk`: anything below the fragile threshold.
+
+## Optimization Engine
+
+`Optimize Deal` uses a hybrid architecture boundary:
+
+- AI-facing boundary: identify sensible commercial variables to consider, such as price, usage caps, discounts, support limits, renewal uplift, SLA credits, and minimum commitments.
+- Backend optimizer: creates bounded candidate changes, evaluates combinations deterministically, and ranks options.
+- Recommendation text: explains the deterministic results rather than inventing new financial outcomes.
+
+The MVP optimizer limits changed clauses to one or two by default. It favors options that increase healthy scenario coverage, expected margin, and downside margin while penalizing base price increases, higher commercial friction, and unnecessary clause changes.

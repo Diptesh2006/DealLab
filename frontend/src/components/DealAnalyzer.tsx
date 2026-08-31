@@ -21,6 +21,7 @@ import {
   analyzeDeal,
   evaluateEconomics,
   evaluateStressTest,
+  optimizeDeal,
   updateEffectiveTerm,
   type CompanyAssumptions,
   type DealIntelligenceResponse,
@@ -30,6 +31,8 @@ import {
   type ScenarioEconomicsResult,
   type ScenarioStressResult,
   type StressTestResponse,
+  type OptimizeDealResponse,
+  type OptimizationOption,
 } from "@/lib/api";
 
 type EditableTerm = EffectiveTerm & {
@@ -76,10 +79,12 @@ export function DealAnalyzer() {
   });
   const [economics, setEconomics] = useState<ScenarioEconomicsResult | null>(null);
   const [stressTest, setStressTest] = useState<StressTestResponse | null>(null);
+  const [optimization, setOptimization] = useState<OptimizeDealResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isStressTesting, setIsStressTesting] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   const unresolvedCount = useMemo(
     () => terms.filter((term) => term.review_status === "requires_human_review" || term.ambiguous).length,
@@ -110,6 +115,7 @@ export function DealAnalyzer() {
       setTerms(result.effective_terms.map(toEditableTerm));
       setEconomics(null);
       setStressTest(null);
+      setOptimization(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deal analysis failed");
     } finally {
@@ -169,10 +175,32 @@ export function DealAnalyzer() {
         },
       });
       setStressTest(result);
+      setOptimization(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Stress test failed");
     } finally {
       setIsStressTesting(false);
+    }
+  }
+
+  async function runOptimization() {
+    if (!terms.length) return;
+
+    setIsOptimizing(true);
+    setError(null);
+    try {
+      const result = await optimizeDeal({
+        terms: terms.map(fromEditableTerm),
+        assumptions,
+        expected_usage_units: scenario.expected_usage_units,
+        expected_usage_revenue: scenario.usage_revenue,
+        max_changed_clauses: 2,
+      });
+      setOptimization(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Deal optimization failed");
+    } finally {
+      setIsOptimizing(false);
     }
   }
 
@@ -363,10 +391,19 @@ export function DealAnalyzer() {
                   {isStressTesting ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
                   Run Stress Test
                 </button>
+                <button
+                  className="ml-2 mt-4 inline-flex items-center gap-2 rounded-md bg-mint px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                  onClick={runOptimization}
+                  disabled={isOptimizing}
+                >
+                  {isOptimizing ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+                  Optimize Deal
+                </button>
               </div>
             </div>
 
             {economics ? <EconomicsResult result={economics} /> : null}
+            {optimization ? <OptimizationResult result={optimization} /> : null}
             {stressTest ? <StressTestResult result={stressTest} deal={deal} /> : null}
           </div>
         ) : null}
@@ -607,6 +644,142 @@ function StressTestResult({ result, deal }: { result: StressTestResponse; deal: 
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+function OptimizationResult({ result }: { result: OptimizeDealResponse }) {
+  const best = result.options[0];
+
+  if (!best) {
+    return (
+      <section className="mt-6 rounded-md border border-ink/10 bg-white p-5">
+        <p className="text-sm font-medium uppercase tracking-wide text-steel">Optimize Deal</p>
+        <h2 className="mt-1 text-xl font-semibold text-ink">No bounded improvement found</h2>
+        <p className="mt-2 text-sm leading-6 text-steel">
+          The optimizer did not find a practical one- or two-clause change that improves stress-test resilience.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-6 rounded-md border border-ink/10 bg-white">
+      <div className="border-b border-ink/10 p-5">
+        <p className="text-sm font-medium uppercase tracking-wide text-steel">Optimize Deal</p>
+        <h2 className="mt-1 text-xl font-semibold text-ink">{best.title}</h2>
+        <p className="mt-2 text-sm leading-6 text-steel">
+          Ranked by deterministic stress-test improvement, customer impact, clause count, commercial friction, and deviation from the original deal.
+        </p>
+      </div>
+
+      <div className="grid gap-4 p-5 lg:grid-cols-2">
+        <DealState title="Current Deal" health={best.current_health} formattedExposure={best.formatted_current_annual_exposure} />
+        <DealState title="Optimized Deal" health={best.optimized_health} formattedExposure={best.formatted_optimized_annual_exposure} highlighted />
+      </div>
+
+      <div className="grid gap-4 border-t border-ink/10 p-5 lg:grid-cols-[1fr_0.8fr]">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-steel">Changed terms</p>
+          <div className="mt-3 space-y-3">
+            {best.changed_terms.map((change) => (
+              <div key={change.field_name} className="rounded-md border border-mint/30 bg-mint/10 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold text-ink">{humanize(change.field_name)}</p>
+                  <span className="rounded-md border border-ink/10 bg-white px-2 py-1 text-xs text-steel">
+                    friction {change.commercial_friction}/5
+                  </span>
+                </div>
+                <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                  <div className="rounded-md bg-white p-2">
+                    <p className="text-xs uppercase tracking-wide text-steel">Original</p>
+                    <p className="font-medium text-ink">{change.original_value} {change.unit}</p>
+                  </div>
+                  <div className="rounded-md bg-white p-2">
+                    <p className="text-xs uppercase tracking-wide text-steel">Proposed</p>
+                    <p className="font-medium text-ink">{change.proposed_value} {change.unit}</p>
+                  </div>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-ink">{change.rationale}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <SummaryMetric label="Financial improvement" value={best.formatted_financial_improvement} />
+          <SummaryMetric label="Customer impact" value={best.customer_impact} />
+          <ListPanel title="Scenarios fixed" items={best.scenarios_fixed} empty="No scenarios fully fixed." />
+          <ListPanel title="Still risky" items={best.scenarios_still_risky} empty="No risky scenarios remain." />
+          <ListPanel title="Reasons" items={best.reasons_for_recommendation} empty="No ranking reasons returned." />
+        </div>
+      </div>
+
+      {result.options.length > 1 ? (
+        <div className="border-t border-ink/10 p-5">
+          <p className="text-sm font-semibold uppercase tracking-wide text-steel">Alternative options</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {result.options.slice(1).map((option) => (
+              <OptionSummary key={option.title} option={option} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function DealState({
+  title,
+  health,
+  formattedExposure,
+  highlighted = false,
+}: {
+  title: string;
+  health: OptimizationOption["current_health"];
+  formattedExposure: string;
+  highlighted?: boolean;
+}) {
+  return (
+    <div className={`rounded-md border p-4 ${highlighted ? "border-mint/40 bg-mint/10" : "border-ink/10 bg-paper"}`}>
+      <p className="text-sm font-semibold uppercase tracking-wide text-steel">{title}</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <SummaryMetric label="Rating" value={health.rating} />
+        <SummaryMetric label="Healthy scenarios" value={`${health.percentage_above_target_margin}%`} />
+        <SummaryMetric label="Expected margin" value={`${health.expected_scenario_margin}%`} />
+        <SummaryMetric label="Downside margin" value={`${health.downside_margin}%`} />
+        <SummaryMetric label="Annual exposure" value={formattedExposure} />
+        <SummaryMetric label="Critical" value={health.critical_scenarios} />
+      </div>
+    </div>
+  );
+}
+
+function ListPanel({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  return (
+    <div className="rounded-md border border-ink/10 bg-paper p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-steel">{title}</p>
+      <ul className="mt-2 space-y-1 text-sm text-ink">
+        {(items.length ? items : [empty]).map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function OptionSummary({ option }: { option: OptimizationOption }) {
+  return (
+    <div className="rounded-md border border-ink/10 bg-paper p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-semibold text-ink">{option.title}</p>
+        <span className="text-xs font-semibold text-steel">score {option.score}</span>
+      </div>
+      <p className="mt-2 text-sm text-steel">
+        Healthy scenarios {option.current_health.percentage_above_target_margin}% to{" "}
+        {option.optimized_health.percentage_above_target_margin}%; exposure improvement{" "}
+        {option.formatted_financial_improvement}.
+      </p>
     </div>
   );
 }

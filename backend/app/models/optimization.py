@@ -22,6 +22,8 @@ class OptimizationOption(BaseModel):
     optimized_health: DealHealthSummary
     financial_improvement: float
     formatted_financial_improvement: str
+    formatted_current_annual_exposure: str
+    formatted_optimized_annual_exposure: str
     scenarios_fixed: list[str]
     scenarios_still_risky: list[str]
     customer_impact: str

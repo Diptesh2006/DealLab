@@ -202,6 +202,37 @@ export type StressTestResponse = {
   failure_modes: FailureMode[];
 };
 
+export type CandidateChange = {
+  field_name: string;
+  original_value: string;
+  proposed_value: string;
+  unit: string;
+  customer_impact: string;
+  commercial_friction: number;
+  rationale: string;
+};
+
+export type OptimizationOption = {
+  title: string;
+  changed_terms: CandidateChange[];
+  current_health: DealHealthSummary;
+  optimized_health: DealHealthSummary;
+  financial_improvement: number;
+  formatted_financial_improvement: string;
+  formatted_current_annual_exposure: string;
+  formatted_optimized_annual_exposure: string;
+  scenarios_fixed: string[];
+  scenarios_still_risky: string[];
+  customer_impact: string;
+  reasons_for_recommendation: string[];
+  score: number;
+};
+
+export type OptimizeDealResponse = {
+  current_health: DealHealthSummary;
+  options: OptimizationOption[];
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export async function getHealth(): Promise<HealthResponse> {
@@ -302,6 +333,28 @@ export async function evaluateStressTest(payload: {
 
   if (!response.ok) {
     throw new Error(`Stress test failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function optimizeDeal(payload: {
+  terms: EffectiveTerm[];
+  assumptions: CompanyAssumptions;
+  expected_usage_units: number;
+  expected_usage_revenue: number;
+  max_changed_clauses?: number;
+}): Promise<OptimizeDealResponse> {
+  const response = await fetch(`${baseUrl}/api/deals/optimize`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Deal optimization failed: ${response.status}`);
   }
 
   return response.json();

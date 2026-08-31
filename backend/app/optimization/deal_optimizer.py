@@ -246,6 +246,8 @@ def _option(
         optimized_health=optimized.health,
         financial_improvement=round(improvement, 2),
         formatted_financial_improvement=format_currency(improvement, currency),
+        formatted_current_annual_exposure=format_currency(current.health.estimated_annual_exposure, currency),
+        formatted_optimized_annual_exposure=format_currency(optimized.health.estimated_annual_exposure, currency),
         scenarios_fixed=scenarios_fixed,
         scenarios_still_risky=still_risky,
         customer_impact=_customer_impact(changes, original_terms, optimized_terms),
