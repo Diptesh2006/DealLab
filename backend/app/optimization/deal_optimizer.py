@@ -75,7 +75,7 @@ def _bounded_candidates(
     candidates.extend(_discount_candidate(term_map, "recurring_discount", 0.75))
     candidates.extend(_discount_candidate(term_map, "service_credits", 0.5))
     candidates.extend(_price_candidate(term_map, has_critical_scenarios))
-    candidates.extend(_numeric_candidate(term_map, "overage_pricing", 1.25, "Usage-based customer impact", 2, "Improve economics when adoption exceeds included usage."))
+    candidates.extend(_numeric_candidate(term_map, "overage_pricing", 1.75, "Usage-based customer impact", 2, "Improve economics when adoption exceeds included usage."))
     candidates.extend(_numeric_candidate(term_map, "renewal_escalation", 1.5, "Future renewal impact only", 2, "Improve resilience against cost inflation after renewal."))
 
     return [candidate for candidate in candidates if candidate.field_name in OPTIMIZABLE_FIELDS]
@@ -313,7 +313,7 @@ def _score(current_health, optimized_health, changes: list[CandidateChange]) -> 
     exposure_gain = max(0, current_health.estimated_annual_exposure - optimized_health.estimated_annual_exposure) / 100000
     friction_penalty = sum(change.commercial_friction for change in changes) * 2
     clause_penalty = len(changes) * 4
-    price_penalty = _base_price_increase_percent(changes) * 1.2
+    price_penalty = _base_price_increase_percent(changes) * 3.5
     return pass_gain * 1.4 + expected_gain * 1.2 + downside_gain * 1.5 + exposure_gain - friction_penalty - clause_penalty - price_penalty
 
 

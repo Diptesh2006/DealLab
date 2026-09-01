@@ -63,6 +63,11 @@ npm run dev
 
 The frontend calls `GET http://localhost:8000/api/health` and displays live backend/database readiness.
 
+## Demo Dataset
+
+A synthetic ACME Enterprise SaaS/API contract package is available in `demo/acme-enterprise`.
+It includes PDF/text contracts, an amendment, an approved exception note, cost assumptions, scenario inputs, and deterministic benchmark outputs.
+
 ## API
 
 - `GET /api/health`: verifies service and database readiness.
@@ -70,6 +75,7 @@ The frontend calls `GET http://localhost:8000/api/health` and displays live back
 - `POST /api/economics/evaluate`: evaluates one reviewed scenario through deterministic Python formulas.
 - `POST /api/stress-tests/evaluate`: generates the default stress-test scenario set, evaluates each scenario through the deterministic economics engine, and returns deal health.
 - `POST /api/deals/optimize`: creates bounded commercial change candidates, evaluates combinations through the stress-test engine, and returns ranked optimization options.
+- `POST /api/deals/prepare-revised-terms`: prepares a structured commercial recommendation artifact for human approval without modifying legal documents.
 
 Example:
 

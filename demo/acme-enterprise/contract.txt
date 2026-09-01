@@ -1,0 +1,47 @@
+SYNTHETIC DEMO DATA - NOT A REAL CONTRACT
+
+DealLab Demonstration Agreement
+
+Provider: AsterGrid AI Infrastructure Pvt. Ltd.
+Customer: ACME Enterprise Pvt. Ltd.
+Product: AsterGrid Enterprise API Platform
+Effective date: 01 October 2026
+Minimum contract term: 12 months
+Currency: INR
+
+1. Commercial Fees
+ACME will pay an annual base price of INR 30,00,000 for the AsterGrid Enterprise API Platform.
+Billing frequency is annual in advance.
+
+2. Included Usage
+The annual base price includes 1,000,000 API units per month, equivalent to 12,000,000 API units per contract year.
+
+3. Overage
+Usage above the included allowance is charged at INR 0.20 per API unit.
+Monthly overage charges are capped at INR 1,00,000 per month.
+
+4. Introductory Discount
+A one-time 15% introductory discount applies to the first 3 months of the initial contract term only.
+The discount does not apply after month 3 unless separately approved in writing.
+
+5. Support
+The provider will make commercially reasonable support available to ACME for production API issues.
+For this synthetic demo, the support allowance is broad and operationally interpreted as unlimited support during the initial term.
+No separate support overage fee is specified in the agreement.
+
+6. Implementation
+AsterGrid will provide onboarding, API credential setup, sandbox migration assistance, and launch support.
+Implementation obligations are included in the annual base price.
+
+7. Service Level Agreement
+AsterGrid will use commercially reasonable efforts to maintain 99.5% monthly platform availability.
+If monthly availability falls below 99.5%, ACME may receive service credits equal to 5% of affected monthly fees.
+
+8. Renewal Pricing
+Each renewal term will increase by 8% over the prior term unless modified by amendment.
+
+9. Rebates
+No recurring rebate applies to this agreement.
+
+10. Human Approval
+Any revised commercial terms prepared by DealLab are recommendations only and require human approval before legal documentation is changed.

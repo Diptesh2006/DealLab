@@ -1,0 +1,24 @@
+{
+  "synthetic_demo_data": true,
+  "expected_usage_units": 14400000,
+  "expected_usage_note": "Represents 1.2M API units per month annualized for the deterministic engine.",
+  "expected_usage_revenue": 0,
+  "scenarios_to_highlight": [
+    {
+      "name": "Expected adoption",
+      "reason": "Normal case stays commercially plausible against the 55% target margin."
+    },
+    {
+      "name": "High adoption",
+      "reason": "Usage grows beyond the included 12M annual units and tests whether the overage cap limits recovery."
+    },
+    {
+      "name": "Support-heavy customer",
+      "reason": "Broad support obligations increase servicing cost without matching support revenue."
+    },
+    {
+      "name": "High adoption + high support",
+      "reason": "Combines the two major fragility drivers for the hackathon story."
+    }
+  ]
+}

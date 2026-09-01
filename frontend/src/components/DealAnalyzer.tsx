@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Loader2, Save, Send, Upload } from "lucide-react";
+import { CheckCircle2, FileText, Loader2, Save, Send, ShieldCheck, Upload } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import {
@@ -22,8 +22,10 @@ import {
   evaluateEconomics,
   evaluateStressTest,
   optimizeDeal,
+  prepareRevisedTerms,
   updateEffectiveTerm,
   type CompanyAssumptions,
+  type DealWorkflowStatus,
   type DealIntelligenceResponse,
   type EconomicScenarioInput,
   type EffectiveTerm,
@@ -33,6 +35,7 @@ import {
   type StressTestResponse,
   type OptimizeDealResponse,
   type OptimizationOption,
+  type PrepareRevisedTermsResponse,
 } from "@/lib/api";
 
 type EditableTerm = EffectiveTerm & {
@@ -80,6 +83,8 @@ export function DealAnalyzer() {
   const [economics, setEconomics] = useState<ScenarioEconomicsResult | null>(null);
   const [stressTest, setStressTest] = useState<StressTestResponse | null>(null);
   const [optimization, setOptimization] = useState<OptimizeDealResponse | null>(null);
+  const [workflowStatus, setWorkflowStatus] = useState<DealWorkflowStatus>("Draft");
+  const [revisedTerms, setRevisedTerms] = useState<PrepareRevisedTermsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -90,6 +95,8 @@ export function DealAnalyzer() {
     () => terms.filter((term) => term.review_status === "requires_human_review" || term.ambiguous).length,
     [terms],
   );
+
+  const canApproveForSimulation = terms.length > 0 && unresolvedCount === 0;
 
   async function submit() {
     if (!mainContract) {
@@ -116,6 +123,8 @@ export function DealAnalyzer() {
       setEconomics(null);
       setStressTest(null);
       setOptimization(null);
+      setRevisedTerms(null);
+      setWorkflowStatus(hasReviewIssues(result.effective_terms) ? "Needs Review" : "AI Analyzed");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deal analysis failed");
     } finally {
@@ -134,6 +143,7 @@ export function DealAnalyzer() {
         reason: "Edited on Deal Terms Review screen",
       });
       setTerms((current) => current.map((item) => (item.id === term.id ? toEditableTerm(updated) : item)));
+      setWorkflowStatus(hasReviewIssues(terms.map((item) => (item.id === term.id ? toEditableTerm(updated) : item))) ? "Needs Review" : "AI Analyzed");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Manual edit failed");
       setTerms((current) => current.map((item) => (item.id === term.id ? { ...item, isSaving: false } : item)));
@@ -176,6 +186,7 @@ export function DealAnalyzer() {
       });
       setStressTest(result);
       setOptimization(null);
+      setRevisedTerms(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Stress test failed");
     } finally {
@@ -197,8 +208,24 @@ export function DealAnalyzer() {
         max_changed_clauses: 2,
       });
       setOptimization(result);
+      setRevisedTerms(null);
+      setWorkflowStatus(result.workflow_status);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deal optimization failed");
+    } finally {
+      setIsOptimizing(false);
+    }
+  }
+
+  async function prepareTermsArtifact(option: OptimizationOption) {
+    setIsOptimizing(true);
+    setError(null);
+    try {
+      const result = await prepareRevisedTerms(option);
+      setRevisedTerms(result);
+      setWorkflowStatus(result.workflow_status);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Prepare revised terms failed");
     } finally {
       setIsOptimizing(false);
     }
@@ -269,6 +296,9 @@ export function DealAnalyzer() {
             </h2>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-semibold">
+            <span className="rounded-md border border-ink/10 bg-paper px-2 py-1 text-ink">
+              {workflowStatus}
+            </span>
             <span className="rounded-md border border-mint/40 bg-mint/10 px-2 py-1">Confirmed</span>
             <span className="rounded-md border border-amber/50 bg-amber/10 px-2 py-1">Inferred</span>
             <span className="rounded-md border border-red-300 bg-red-50 px-2 py-1">{unresolvedCount} unresolved</span>
@@ -376,6 +406,15 @@ export function DealAnalyzer() {
                   <Toggle label="Rebates" checked={scenario.apply_rebates} onChange={(checked) => setScenario({ ...scenario, apply_rebates: checked })} />
                 </div>
                 <button
+                  className="mr-2 mt-4 inline-flex items-center gap-2 rounded-md border border-mint/40 bg-white px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                  onClick={() => setWorkflowStatus("Approved for Simulation")}
+                  disabled={!canApproveForSimulation}
+                  title={canApproveForSimulation ? "Mark reviewed terms approved for simulation" : "Resolve ambiguous or human-review terms first"}
+                >
+                  <ShieldCheck size={16} />
+                  Approve for Simulation
+                </button>
+                <button
                   className="mt-4 inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   onClick={calculateEconomics}
                   disabled={isEvaluating}
@@ -403,7 +442,14 @@ export function DealAnalyzer() {
             </div>
 
             {economics ? <EconomicsResult result={economics} /> : null}
-            {optimization ? <OptimizationResult result={optimization} /> : null}
+            {optimization ? (
+              <OptimizationResult
+                result={optimization}
+                revisedTerms={revisedTerms}
+                onPrepare={prepareTermsArtifact}
+                isPreparing={isOptimizing}
+              />
+            ) : null}
             {stressTest ? <StressTestResult result={stressTest} deal={deal} /> : null}
           </div>
         ) : null}
@@ -648,7 +694,17 @@ function StressTestResult({ result, deal }: { result: StressTestResponse; deal: 
   );
 }
 
-function OptimizationResult({ result }: { result: OptimizeDealResponse }) {
+function OptimizationResult({
+  result,
+  revisedTerms,
+  onPrepare,
+  isPreparing,
+}: {
+  result: OptimizeDealResponse;
+  revisedTerms: PrepareRevisedTermsResponse | null;
+  onPrepare: (option: OptimizationOption) => void;
+  isPreparing: boolean;
+}) {
   const best = result.options[0];
 
   if (!best) {
@@ -666,8 +722,16 @@ function OptimizationResult({ result }: { result: OptimizeDealResponse }) {
   return (
     <section className="mt-6 rounded-md border border-ink/10 bg-white">
       <div className="border-b border-ink/10 p-5">
-        <p className="text-sm font-medium uppercase tracking-wide text-steel">Optimize Deal</p>
-        <h2 className="mt-1 text-xl font-semibold text-ink">{best.title}</h2>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-steel">Optimize Deal</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">{best.title}</h2>
+          </div>
+          <span className="inline-flex w-fit items-center gap-2 rounded-md border border-mint/40 bg-mint/10 px-3 py-2 text-xs font-semibold text-ink">
+            <CheckCircle2 size={14} />
+            {result.workflow_status}
+          </span>
+        </div>
         <p className="mt-2 text-sm leading-6 text-steel">
           Ranked by deterministic stress-test improvement, customer impact, clause count, commercial friction, and deviation from the original deal.
         </p>
@@ -701,6 +765,14 @@ function OptimizationResult({ result }: { result: OptimizeDealResponse }) {
                   </div>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-ink">{change.rationale}</p>
+                <p className="mt-2 text-xs leading-5 text-steel">
+                  Evidence: {change.evidence_excerpt ?? "requires_human_review"}{" "}
+                  {change.source_document ? `(${change.source_document})` : ""}
+                </p>
+                <p className="mt-1 text-xs text-steel">
+                  AI reasoning status: {humanize(change.reasoning_status)}; extraction confidence{" "}
+                  {Math.round(change.confidence * 100)}%
+                </p>
               </div>
             ))}
           </div>
@@ -712,8 +784,63 @@ function OptimizationResult({ result }: { result: OptimizeDealResponse }) {
           <ListPanel title="Scenarios fixed" items={best.scenarios_fixed} empty="No scenarios fully fixed." />
           <ListPanel title="Still risky" items={best.scenarios_still_risky} empty="No risky scenarios remain." />
           <ListPanel title="Reasons" items={best.reasons_for_recommendation} empty="No ranking reasons returned." />
+          <button
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            onClick={() => onPrepare(best)}
+            disabled={isPreparing}
+          >
+            {isPreparing ? <Loader2 className="animate-spin" size={16} /> : <ShieldCheck size={16} />}
+            Prepare Revised Terms
+          </button>
         </div>
       </div>
+
+      <div className="border-t border-ink/10 p-5">
+        <p className="text-sm font-semibold uppercase tracking-wide text-steel">Trust trace</p>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          {best.trust_traces.map((trace) => (
+            <div key={`${trace.effective_interpretation}-${trace.scenario_assumption}`} className="rounded-md border border-ink/10 bg-paper p-3 text-sm">
+              <p className="font-semibold text-ink">Contract evidence</p>
+              <p className="mt-1 text-steel">{trace.contract_evidence}</p>
+              <p className="mt-3 font-semibold text-ink">Effective interpretation</p>
+              <p className="mt-1 text-steel">{trace.effective_interpretation}</p>
+              <p className="mt-3 font-semibold text-ink">Scenario assumption</p>
+              <p className="mt-1 text-steel">{trace.scenario_assumption}</p>
+              <p className="mt-3 font-semibold text-ink">Deterministic calculation</p>
+              <p className="mt-1 text-steel">{trace.deterministic_calculation}</p>
+              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-steel">
+                {humanize(trace.ai_reasoning_status)} - {Math.round(trace.confidence * 100)}% extraction confidence
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {revisedTerms ? (
+        <div className="border-t border-ink/10 bg-paper p-5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm font-semibold uppercase tracking-wide text-steel">Prepared revised terms</p>
+            <span className="rounded-md border border-amber/50 bg-amber/10 px-3 py-1 text-xs font-semibold text-ink">
+              Subject to human approval
+            </span>
+          </div>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {revisedTerms.revised_terms.map((term) => (
+              <div key={term.field_name} className="rounded-md border border-ink/10 bg-white p-3 text-sm">
+                <p className="font-semibold text-ink">{humanize(term.field_name)}</p>
+                <p className="mt-2"><span className="font-semibold text-steel">Current:</span> {term.current}</p>
+                <p className="mt-1"><span className="font-semibold text-steel">Proposed:</span> {term.proposed}</p>
+                <p className="mt-3"><span className="font-semibold text-steel">Reason:</span> {term.reason}</p>
+                <p className="mt-1"><span className="font-semibold text-steel">Expected effect:</span> {term.expected_effect}</p>
+                <p className="mt-3 text-xs leading-5 text-steel">Evidence: {term.evidence_excerpt}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 rounded-md border border-amber/50 bg-white p-3 text-sm leading-6 text-ink">
+            {revisedTerms.approval_note}
+          </p>
+        </div>
+      ) : null}
 
       {result.options.length > 1 ? (
         <div className="border-t border-ink/10 p-5">
@@ -887,6 +1014,10 @@ function fromEditableTerm(term: EditableTerm): EffectiveTerm {
     normalized_value: term.draftValue,
     unit: term.draftUnit,
   };
+}
+
+function hasReviewIssues(items: EffectiveTerm[]) {
+  return items.some((term) => term.review_status === "requires_human_review" || term.ambiguous);
 }
 
 function updateDraft(

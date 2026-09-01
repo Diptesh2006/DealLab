@@ -1,0 +1,16 @@
+SYNTHETIC DEMO DATA - APPROVED COMMERCIAL EXCEPTION
+
+Approved Commercial Exception Note
+
+Customer: ACME Enterprise Pvt. Ltd.
+Deal: AsterGrid Enterprise API Platform
+Approval owner: Synthetic Deal Desk
+Approval date: 20 October 2026
+
+Temporary Exception
+The 15% introductory discount for the first 3 months is approved for this deal because ACME is migrating from a legacy internal API gateway.
+The exception is temporary and does not renew automatically.
+
+Commercial Guardrail
+Deal Desk approval assumes normal adoption near 1.2M API units per month and typical support consumption near 120 hours per year.
+Any request to extend the discount, remove overage fees, or maintain unlimited support after renewal requires fresh approval.

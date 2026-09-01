@@ -1,0 +1,684 @@
+{
+  "synthetic_demo_data": true,
+  "health": {
+    "rating": "Commercially Fragile",
+    "percentage_above_target_margin": 50.0,
+    "expected_scenario_margin": 59.68,
+    "downside_margin": 33.76,
+    "worst_case_margin": 33.76,
+    "estimated_annual_exposure": 906958.2,
+    "critical_scenarios": 1,
+    "warning_scenarios": 4,
+    "calculation_config": {
+      "target_margin_percent": 55.0,
+      "warning_margin_gap_percent": 5.0,
+      "critical_margin_gap_percent": 10.0,
+      "healthy_min_pass_rate": 0.8,
+      "mostly_healthy_min_pass_rate": 0.6,
+      "fragile_min_pass_rate": 0.4
+    }
+  },
+  "scenario_margins": [
+    {
+      "scenario": "Conservative adoption",
+      "gross_margin_percent": 55.8,
+      "downside_exposure": 0.0,
+      "status": "pass"
+    },
+    {
+      "scenario": "Expected adoption",
+      "gross_margin_percent": 59.68,
+      "downside_exposure": 0.0,
+      "status": "pass"
+    },
+    {
+      "scenario": "High adoption",
+      "gross_margin_percent": 63.95,
+      "downside_exposure": 0.0,
+      "status": "pass"
+    },
+    {
+      "scenario": "Support-heavy customer",
+      "gross_margin_percent": 54.62,
+      "downside_exposure": 11220.0,
+      "status": "warning"
+    },
+    {
+      "scenario": "Infrastructure-cost increase",
+      "gross_margin_percent": 47.35,
+      "downside_exposure": 226356.0,
+      "status": "warning"
+    },
+    {
+      "scenario": "Renewal",
+      "gross_margin_percent": 58.06,
+      "downside_exposure": 0.0,
+      "status": "pass"
+    },
+    {
+      "scenario": "Discount expiry",
+      "gross_margin_percent": 65.73,
+      "downside_exposure": 0.0,
+      "status": "pass"
+    },
+    {
+      "scenario": "SLA degradation",
+      "gross_margin_percent": 51.62,
+      "downside_exposure": 95055.0,
+      "status": "warning"
+    },
+    {
+      "scenario": "High adoption + high support",
+      "gross_margin_percent": 53.23,
+      "downside_exposure": 59908.2,
+      "status": "warning"
+    },
+    {
+      "scenario": "Downside commercial scenario",
+      "gross_margin_percent": 33.76,
+      "downside_exposure": 514419.0,
+      "status": "critical"
+    }
+  ],
+  "top_failure_modes": [
+    {
+      "title": "Combined Downside Breaks Guardrails",
+      "affected_clause": "discounts / rebates / service credits / support obligations",
+      "scenario": "Downside commercial scenario",
+      "why_it_fails": "Multiple concessions stack in the same scenario and push margin below target.",
+      "financial_impact": 514419.0,
+      "formatted_financial_impact": "₹5,14,419.00",
+      "severity": "critical",
+      "confidence": 0.86,
+      "original_source": "contract.txt, page 1",
+      "recommended_remediation_category": "Reduce concession stacking and add minimum commitment",
+      "explanation": "Contract term: discounts, rebates, credits, and support costs are evaluated together. In Downside commercial scenario, multiple concessions stack in the same scenario and push margin below target. The deterministic calculation shows scenario margin 33.76% vs target 55.0%, creating ₹5,14,419.00 annual exposure. The consequence is reduced downside protection before signature."
+    },
+    {
+      "title": "Infrastructure Inflation Outruns Pricing",
+      "affected_clause": "renewal_escalation / overage_pricing",
+      "scenario": "Infrastructure-cost increase",
+      "why_it_fails": "Cost multiplier increases total delivery cost without matching price protection.",
+      "financial_impact": 226356.0,
+      "formatted_financial_impact": "₹2,26,356.00",
+      "severity": "warning",
+      "confidence": 0.86,
+      "original_source": "amendment-1.txt, page 1",
+      "recommended_remediation_category": "Add cost-indexed uplift or usage-based pricing floor",
+      "explanation": "Contract term: renewal escalation 8, overage price 0.2. In Infrastructure-cost increase, cost multiplier increases total delivery cost without matching price protection. The deterministic calculation shows scenario margin 47.35% vs target 55.0%, creating ₹2,26,356.00 annual exposure. The consequence is reduced downside protection before signature."
+    },
+    {
+      "title": "Service Credits Amplify Downside",
+      "affected_clause": "sla_threshold / service_credits",
+      "scenario": "SLA degradation",
+      "why_it_fails": "Lower SLA performance triggers credits while support and infrastructure costs rise.",
+      "financial_impact": 95055.0,
+      "formatted_financial_impact": "₹95,055.00",
+      "severity": "warning",
+      "confidence": 0.86,
+      "original_source": "contract.txt, page 1",
+      "recommended_remediation_category": "Narrow credit triggers and cap monthly service credits",
+      "explanation": "Contract term: SLA threshold 99.5, service credits 5. In SLA degradation, lower sla performance triggers credits while support and infrastructure costs rise. The deterministic calculation shows scenario margin 51.62% vs target 55.0%, creating ₹95,055.00 annual exposure. The consequence is reduced downside protection before signature."
+    }
+  ],
+  "optimization": {
+    "current_health": {
+      "rating": "Commercially Fragile",
+      "percentage_above_target_margin": 50.0,
+      "expected_scenario_margin": 59.68,
+      "downside_margin": 33.76,
+      "worst_case_margin": 33.76,
+      "estimated_annual_exposure": 906958.2,
+      "critical_scenarios": 1,
+      "warning_scenarios": 4,
+      "calculation_config": {
+        "target_margin_percent": 55.0,
+        "warning_margin_gap_percent": 5.0,
+        "critical_margin_gap_percent": 10.0,
+        "healthy_min_pass_rate": 0.8,
+        "mostly_healthy_min_pass_rate": 0.6,
+        "fragile_min_pass_rate": 0.4
+      }
+    },
+    "workflow_status": "Optimized",
+    "options": [
+      {
+        "title": "Remove overage cap + Increase overage price",
+        "changed_terms": [
+          {
+            "field_name": "maximum_usage_payment_cap",
+            "original_value": "100000",
+            "proposed_value": "uncapped",
+            "unit": "INR_per_month",
+            "customer_impact": "No base price increase",
+            "commercial_friction": 2,
+            "rationale": "Remove cap so high adoption produces recoverable overage revenue.",
+            "evidence_excerpt": "Monthly overage charges are capped at INR 1,00,000 per month.",
+            "source_document": "contract.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.96
+          },
+          {
+            "field_name": "overage_pricing",
+            "original_value": "0.2",
+            "proposed_value": "0.35",
+            "unit": "INR_per_api_call",
+            "customer_impact": "Usage-based customer impact",
+            "commercial_friction": 2,
+            "rationale": "Improve economics when adoption exceeds included usage.",
+            "evidence_excerpt": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "source_document": "contract.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.98
+          }
+        ],
+        "current_health": {
+          "rating": "Commercially Fragile",
+          "percentage_above_target_margin": 50.0,
+          "expected_scenario_margin": 59.68,
+          "downside_margin": 33.76,
+          "worst_case_margin": 33.76,
+          "estimated_annual_exposure": 906958.2,
+          "critical_scenarios": 1,
+          "warning_scenarios": 4,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "optimized_health": {
+          "rating": "Mostly Healthy",
+          "percentage_above_target_margin": 80.0,
+          "expected_scenario_margin": 63.46,
+          "downside_margin": 33.76,
+          "worst_case_margin": 33.76,
+          "estimated_annual_exposure": 603075.0,
+          "critical_scenarios": 1,
+          "warning_scenarios": 1,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "financial_improvement": 303883.2,
+        "formatted_financial_improvement": "₹3,03,883.20",
+        "formatted_current_annual_exposure": "₹9,06,958.20",
+        "formatted_optimized_annual_exposure": "₹6,03,075.00",
+        "scenarios_fixed": [
+          "Support-heavy customer",
+          "SLA degradation",
+          "High adoption + high support"
+        ],
+        "scenarios_still_risky": [
+          "Infrastructure-cost increase",
+          "Downside commercial scenario"
+        ],
+        "customer_impact": "No base price increase; 2 structural clause change(s).",
+        "reasons_for_recommendation": [
+          "Healthy scenarios improve from 50.0% to 80.0%.",
+          "Downside margin improves from 33.76% to 33.76%.",
+          "Fixes 3 scenario(s): Support-heavy customer, SLA degradation, High adoption + high support.",
+          "Touches only 2 clause(s): maximum_usage_payment_cap, overage_pricing."
+        ],
+        "trust_traces": [
+          {
+            "contract_evidence": "Monthly overage charges are capped at INR 1,00,000 per month.",
+            "effective_interpretation": "maximum_usage_payment_cap changes from '100000' to 'uncapped'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 80.0% and annual exposure 603075.0.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.96
+          },
+          {
+            "contract_evidence": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "effective_interpretation": "overage_pricing changes from '0.2' to '0.35'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 80.0% and annual exposure 603075.0.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.98
+          }
+        ],
+        "score": 33.5748
+      },
+      {
+        "title": "Increase overage price",
+        "changed_terms": [
+          {
+            "field_name": "overage_pricing",
+            "original_value": "0.2",
+            "proposed_value": "0.35",
+            "unit": "INR_per_api_call",
+            "customer_impact": "Usage-based customer impact",
+            "commercial_friction": 2,
+            "rationale": "Improve economics when adoption exceeds included usage.",
+            "evidence_excerpt": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "source_document": "contract.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.98
+          }
+        ],
+        "current_health": {
+          "rating": "Commercially Fragile",
+          "percentage_above_target_margin": 50.0,
+          "expected_scenario_margin": 59.68,
+          "downside_margin": 33.76,
+          "worst_case_margin": 33.76,
+          "estimated_annual_exposure": 906958.2,
+          "critical_scenarios": 1,
+          "warning_scenarios": 4,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "optimized_health": {
+          "rating": "Mostly Healthy",
+          "percentage_above_target_margin": 70.0,
+          "expected_scenario_margin": 63.46,
+          "downside_margin": 33.76,
+          "worst_case_margin": 33.76,
+          "estimated_annual_exposure": 662983.2,
+          "critical_scenarios": 1,
+          "warning_scenarios": 2,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "financial_improvement": 243975.0,
+        "formatted_financial_improvement": "₹2,43,975.00",
+        "formatted_current_annual_exposure": "₹9,06,958.20",
+        "formatted_optimized_annual_exposure": "₹6,62,983.20",
+        "scenarios_fixed": [
+          "Support-heavy customer",
+          "SLA degradation"
+        ],
+        "scenarios_still_risky": [
+          "Infrastructure-cost increase",
+          "High adoption + high support",
+          "Downside commercial scenario"
+        ],
+        "customer_impact": "No base price increase; 1 structural clause change(s).",
+        "reasons_for_recommendation": [
+          "Healthy scenarios improve from 50.0% to 70.0%.",
+          "Downside margin improves from 33.76% to 33.76%.",
+          "Fixes 2 scenario(s): Support-heavy customer, SLA degradation.",
+          "Touches only 1 clause(s): overage_pricing."
+        ],
+        "trust_traces": [
+          {
+            "contract_evidence": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "effective_interpretation": "overage_pricing changes from '0.2' to '0.35'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 70.0% and annual exposure 662983.2.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.98
+          }
+        ],
+        "score": 26.9758
+      },
+      {
+        "title": "Adjust base price + Increase overage price",
+        "changed_terms": [
+          {
+            "field_name": "base_annual_price",
+            "original_value": "3000000",
+            "proposed_value": "3240000.0",
+            "unit": "currency_per_year",
+            "customer_impact": "8.0% base price increase",
+            "commercial_friction": 5,
+            "rationale": "Use only when lower-friction structural changes do not restore enough resilience.",
+            "evidence_excerpt": "ACME will pay an annual base price of INR 30,00,000.",
+            "source_document": "contract.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.98
+          },
+          {
+            "field_name": "overage_pricing",
+            "original_value": "0.2",
+            "proposed_value": "0.35",
+            "unit": "INR_per_api_call",
+            "customer_impact": "Usage-based customer impact",
+            "commercial_friction": 2,
+            "rationale": "Improve economics when adoption exceeds included usage.",
+            "evidence_excerpt": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "source_document": "contract.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.98
+          }
+        ],
+        "current_health": {
+          "rating": "Commercially Fragile",
+          "percentage_above_target_margin": 50.0,
+          "expected_scenario_margin": 59.68,
+          "downside_margin": 33.76,
+          "worst_case_margin": 33.76,
+          "estimated_annual_exposure": 906958.2,
+          "critical_scenarios": 1,
+          "warning_scenarios": 4,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "optimized_health": {
+          "rating": "Mostly Healthy",
+          "percentage_above_target_margin": 90.0,
+          "expected_scenario_margin": 65.61,
+          "downside_margin": 38.67,
+          "worst_case_margin": 38.67,
+          "estimated_annual_exposure": 427209.0,
+          "critical_scenarios": 1,
+          "warning_scenarios": 0,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "financial_improvement": 479749.2,
+        "formatted_financial_improvement": "₹4,79,749.20",
+        "formatted_current_annual_exposure": "₹9,06,958.20",
+        "formatted_optimized_annual_exposure": "₹4,27,209.00",
+        "scenarios_fixed": [
+          "Support-heavy customer",
+          "Infrastructure-cost increase",
+          "SLA degradation",
+          "High adoption + high support"
+        ],
+        "scenarios_still_risky": [
+          "Downside commercial scenario"
+        ],
+        "customer_impact": "8.0% base price increase plus 1 structural change(s).",
+        "reasons_for_recommendation": [
+          "Healthy scenarios improve from 50.0% to 90.0%.",
+          "Downside margin improves from 33.76% to 38.67%.",
+          "Fixes 4 scenario(s): Support-heavy customer, Infrastructure-cost increase, SLA degradation, High adoption + high support.",
+          "Touches only 2 clause(s): base_annual_price, overage_pricing."
+        ],
+        "trust_traces": [
+          {
+            "contract_evidence": "ACME will pay an annual base price of INR 30,00,000.",
+            "effective_interpretation": "base_annual_price changes from '3000000' to '3240000.0'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 90.0% and annual exposure 427209.0.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.98
+          },
+          {
+            "contract_evidence": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "effective_interpretation": "overage_pricing changes from '0.2' to '0.35'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 90.0% and annual exposure 427209.0.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.98
+          }
+        ],
+        "score": 25.2785
+      },
+      {
+        "title": "Reduce service credits + Increase overage price",
+        "changed_terms": [
+          {
+            "field_name": "service_credits",
+            "original_value": "5",
+            "proposed_value": "2.5",
+            "unit": "percent",
+            "customer_impact": "Reduces concession value",
+            "commercial_friction": 3,
+            "rationale": "Reduce concession leakage while keeping negotiated structure intact.",
+            "evidence_excerpt": "ACME may receive service credits equal to 5% of affected monthly fees.",
+            "source_document": "contract.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.93
+          },
+          {
+            "field_name": "overage_pricing",
+            "original_value": "0.2",
+            "proposed_value": "0.35",
+            "unit": "INR_per_api_call",
+            "customer_impact": "Usage-based customer impact",
+            "commercial_friction": 2,
+            "rationale": "Improve economics when adoption exceeds included usage.",
+            "evidence_excerpt": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "source_document": "contract.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.98
+          }
+        ],
+        "current_health": {
+          "rating": "Commercially Fragile",
+          "percentage_above_target_margin": 50.0,
+          "expected_scenario_margin": 59.68,
+          "downside_margin": 33.76,
+          "worst_case_margin": 33.76,
+          "estimated_annual_exposure": 906958.2,
+          "critical_scenarios": 1,
+          "warning_scenarios": 4,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "optimized_health": {
+          "rating": "Mostly Healthy",
+          "percentage_above_target_margin": 70.0,
+          "expected_scenario_margin": 63.46,
+          "downside_margin": 35.46,
+          "worst_case_margin": 35.46,
+          "estimated_annual_exposure": 594133.2,
+          "critical_scenarios": 1,
+          "warning_scenarios": 2,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "financial_improvement": 312825.0,
+        "formatted_financial_improvement": "₹3,12,825.00",
+        "formatted_current_annual_exposure": "₹9,06,958.20",
+        "formatted_optimized_annual_exposure": "₹5,94,133.20",
+        "scenarios_fixed": [
+          "Support-heavy customer",
+          "SLA degradation"
+        ],
+        "scenarios_still_risky": [
+          "Infrastructure-cost increase",
+          "High adoption + high support",
+          "Downside commercial scenario"
+        ],
+        "customer_impact": "No base price increase; 2 structural clause change(s).",
+        "reasons_for_recommendation": [
+          "Healthy scenarios improve from 50.0% to 70.0%.",
+          "Downside margin improves from 33.76% to 35.46%.",
+          "Fixes 2 scenario(s): Support-heavy customer, SLA degradation.",
+          "Touches only 2 clause(s): service_credits, overage_pricing."
+        ],
+        "trust_traces": [
+          {
+            "contract_evidence": "ACME may receive service credits equal to 5% of affected monthly fees.",
+            "effective_interpretation": "service_credits changes from '5' to '2.5'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 70.0% and annual exposure 594133.2.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.93
+          },
+          {
+            "contract_evidence": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "effective_interpretation": "overage_pricing changes from '0.2' to '0.35'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 70.0% and annual exposure 594133.2.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.98
+          }
+        ],
+        "score": 20.2143
+      },
+      {
+        "title": "Increase overage price + Increase renewal uplift",
+        "changed_terms": [
+          {
+            "field_name": "overage_pricing",
+            "original_value": "0.2",
+            "proposed_value": "0.35",
+            "unit": "INR_per_api_call",
+            "customer_impact": "Usage-based customer impact",
+            "commercial_friction": 2,
+            "rationale": "Improve economics when adoption exceeds included usage.",
+            "evidence_excerpt": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "source_document": "contract.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.98
+          },
+          {
+            "field_name": "renewal_escalation",
+            "original_value": "8",
+            "proposed_value": "12.0",
+            "unit": "percent",
+            "customer_impact": "Future renewal impact only",
+            "commercial_friction": 2,
+            "rationale": "Improve resilience against cost inflation after renewal.",
+            "evidence_excerpt": "All subsequent renewals remain subject to the original 8% renewal increase.",
+            "source_document": "amendment-1.txt",
+            "reasoning_status": "confirmed",
+            "confidence": 0.97
+          }
+        ],
+        "current_health": {
+          "rating": "Commercially Fragile",
+          "percentage_above_target_margin": 50.0,
+          "expected_scenario_margin": 59.68,
+          "downside_margin": 33.76,
+          "worst_case_margin": 33.76,
+          "estimated_annual_exposure": 906958.2,
+          "critical_scenarios": 1,
+          "warning_scenarios": 4,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "optimized_health": {
+          "rating": "Mostly Healthy",
+          "percentage_above_target_margin": 70.0,
+          "expected_scenario_margin": 63.46,
+          "downside_margin": 33.76,
+          "worst_case_margin": 33.76,
+          "estimated_annual_exposure": 662983.2,
+          "critical_scenarios": 1,
+          "warning_scenarios": 2,
+          "calculation_config": {
+            "target_margin_percent": 55.0,
+            "warning_margin_gap_percent": 5.0,
+            "critical_margin_gap_percent": 10.0,
+            "healthy_min_pass_rate": 0.8,
+            "mostly_healthy_min_pass_rate": 0.6,
+            "fragile_min_pass_rate": 0.4
+          }
+        },
+        "financial_improvement": 243975.0,
+        "formatted_financial_improvement": "₹2,43,975.00",
+        "formatted_current_annual_exposure": "₹9,06,958.20",
+        "formatted_optimized_annual_exposure": "₹6,62,983.20",
+        "scenarios_fixed": [
+          "Support-heavy customer",
+          "SLA degradation"
+        ],
+        "scenarios_still_risky": [
+          "Infrastructure-cost increase",
+          "High adoption + high support",
+          "Downside commercial scenario"
+        ],
+        "customer_impact": "No base price increase; 2 structural clause change(s).",
+        "reasons_for_recommendation": [
+          "Healthy scenarios improve from 50.0% to 70.0%.",
+          "Downside margin improves from 33.76% to 33.76%.",
+          "Fixes 2 scenario(s): Support-heavy customer, SLA degradation.",
+          "Touches only 2 clause(s): overage_pricing, renewal_escalation."
+        ],
+        "trust_traces": [
+          {
+            "contract_evidence": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+            "effective_interpretation": "overage_pricing changes from '0.2' to '0.35'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 70.0% and annual exposure 662983.2.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.98
+          },
+          {
+            "contract_evidence": "All subsequent renewals remain subject to the original 8% renewal increase.",
+            "effective_interpretation": "renewal_escalation changes from '8' to '12.0'. This is a commercial recommendation, not a legal document edit.",
+            "scenario_assumption": "Infrastructure-cost increase: usage x1.0, support 120.0h, cost x1.35, discount state 'contracted discounts active'.",
+            "deterministic_calculation": "Current healthy scenarios 50.0% and annual exposure 906958.2; optimized healthy scenarios 70.0% and annual exposure 662983.2.",
+            "ai_reasoning_status": "confirmed",
+            "confidence": 0.97
+          }
+        ],
+        "score": 18.9758
+      }
+    ]
+  },
+  "prepared_revised_terms": {
+    "workflow_status": "Approved Recommendation",
+    "subject_to_human_approval": true,
+    "revised_terms": [
+      {
+        "field_name": "maximum_usage_payment_cap",
+        "current": "100000 INR_per_month",
+        "proposed": "uncapped INR_per_month",
+        "reason": "Remove cap so high adoption produces recoverable overage revenue.",
+        "expected_effect": "Healthy scenarios 50.0% -> 80.0%; downside margin 33.76% -> 33.76%.",
+        "evidence_excerpt": "Monthly overage charges are capped at INR 1,00,000 per month.",
+        "source_document": "contract.txt",
+        "approval_required": true
+      },
+      {
+        "field_name": "overage_pricing",
+        "current": "0.2 INR_per_api_call",
+        "proposed": "0.35 INR_per_api_call",
+        "reason": "Improve economics when adoption exceeds included usage.",
+        "expected_effect": "Healthy scenarios 50.0% -> 80.0%; downside margin 33.76% -> 33.76%.",
+        "evidence_excerpt": "Usage above the included allowance is charged at INR 0.20 per API unit.",
+        "source_document": "contract.txt",
+        "approval_required": true
+      }
+    ],
+    "approval_note": "Prepared commercial recommendation only. DealLab has not modified or signed any legal document; all proposed terms remain subject to human approval."
+  },
+  "tuning_note": "The synthetic economics are tuned so the expected case is acceptable, while high adoption, support intensity, and combined downside scenarios expose commercial fragility."
+}

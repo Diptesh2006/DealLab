@@ -210,6 +210,19 @@ export type CandidateChange = {
   customer_impact: string;
   commercial_friction: number;
   rationale: string;
+  evidence_excerpt?: string | null;
+  source_document?: string | null;
+  reasoning_status: string;
+  confidence: number;
+};
+
+export type TrustTrace = {
+  contract_evidence: string;
+  effective_interpretation: string;
+  scenario_assumption: string;
+  deterministic_calculation: string;
+  ai_reasoning_status: string;
+  confidence: number;
 };
 
 export type OptimizationOption = {
@@ -226,11 +239,38 @@ export type OptimizationOption = {
   customer_impact: string;
   reasons_for_recommendation: string[];
   score: number;
+  trust_traces: TrustTrace[];
 };
 
 export type OptimizeDealResponse = {
   current_health: DealHealthSummary;
   options: OptimizationOption[];
+  workflow_status: DealWorkflowStatus;
+};
+
+export type DealWorkflowStatus =
+  | "Draft"
+  | "AI Analyzed"
+  | "Needs Review"
+  | "Approved for Simulation"
+  | "Optimized"
+  | "Approved Recommendation";
+
+export type RevisedTermBlock = {
+  field_name: string;
+  current: string;
+  proposed: string;
+  reason: string;
+  expected_effect: string;
+  evidence_excerpt: string;
+  approval_required: boolean;
+};
+
+export type PrepareRevisedTermsResponse = {
+  workflow_status: DealWorkflowStatus;
+  subject_to_human_approval: boolean;
+  revised_terms: RevisedTermBlock[];
+  approval_note: string;
 };
 
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -355,6 +395,22 @@ export async function optimizeDeal(payload: {
 
   if (!response.ok) {
     throw new Error(`Deal optimization failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function prepareRevisedTerms(option: OptimizationOption): Promise<PrepareRevisedTermsResponse> {
+  const response = await fetch(`${baseUrl}/api/deals/prepare-revised-terms`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ option }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Prepare revised terms failed: ${response.status}`);
   }
 
   return response.json();

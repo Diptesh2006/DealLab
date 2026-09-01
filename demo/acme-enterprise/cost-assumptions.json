@@ -1,0 +1,15 @@
+{
+  "synthetic_demo_data": true,
+  "provider": "AsterGrid AI Infrastructure Pvt. Ltd.",
+  "customer": "ACME Enterprise",
+  "target_gross_margin_note": "Configured to make the normal case reasonable while exposing fragility under high adoption and support-heavy cases.",
+  "assumptions": {
+    "cost_per_api_call": 0.01,
+    "monthly_infrastructure_cost": 60000,
+    "cost_per_support_hour": 1200,
+    "implementation_cost": 150000,
+    "minimum_acceptable_gross_margin": 55,
+    "typical_support_consumption_hours": 120,
+    "expected_annual_cost_inflation": 4
+  }
+}

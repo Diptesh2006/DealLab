@@ -1,0 +1,15 @@
+SYNTHETIC DEMO DATA - NOT A REAL AMENDMENT
+
+Amendment 1 to DealLab Demonstration Agreement
+
+Provider: AsterGrid AI Infrastructure Pvt. Ltd.
+Customer: ACME Enterprise Pvt. Ltd.
+Effective date: 15 October 2026
+
+1. Renewal Uplift Waiver
+The 8% renewal increase described in Section 8 of the master agreement is waived for the first renewal term only.
+For clarity, the first renewal increase is 0%.
+All subsequent renewals remain subject to the original 8% renewal increase.
+
+2. No Other Changes
+Except as expressly modified by this Amendment 1, all commercial terms of the master agreement remain unchanged.
