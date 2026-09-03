@@ -8,6 +8,7 @@ from backend.app.audit.evidence import record_event
 from backend.app.core.config import get_settings
 from backend.app.db.connection import get_connection
 from backend.app.models.api import ContractAnalysisResponse, ContractTextRequest, HealthResponse
+from backend.app.models.billing import PrepareRazorpayBillingRequest, RazorpayBillingSetupResponse
 from backend.app.models.deal import DealAnalysis
 from backend.app.models.economics import EconomicsEvaluationRequest, EconomicsEvaluationResponse
 from backend.app.models.intelligence import (
@@ -32,6 +33,7 @@ from backend.app.services.contract_ingestion import extract_text_from_pdf, norma
 from backend.app.services.commercial_intelligence import SourceDocument, derive_effective_terms
 from backend.app.services.scenario_generation import generate_stress_scenarios
 from backend.app.services.term_extraction import extract_commercial_terms
+from backend.app.services.razorpay_billing import build_billing_preview, create_test_billing_setup
 from backend.app.simulation.engine import evaluate_deal
 from backend.app.simulation.economics import evaluate_financial_scenario
 from backend.app.simulation.stress import run_stress_test
@@ -222,6 +224,29 @@ def optimize_deal_terms(payload: OptimizeDealRequest) -> OptimizeDealResponse:
 @router.post("/deals/prepare-revised-terms", response_model=PrepareRevisedTermsResponse)
 def prepare_revised_terms_artifact(payload: PrepareRevisedTermsRequest) -> PrepareRevisedTermsResponse:
     return prepare_revised_terms(payload.option)
+
+
+@router.post("/deals/{deal_id}/billing/razorpay/prepare", response_model=RazorpayBillingSetupResponse)
+def prepare_razorpay_billing_setup(deal_id: int, payload: PrepareRazorpayBillingRequest) -> RazorpayBillingSetupResponse:
+    with get_connection() as connection:
+        deal = connection.execute("SELECT customer_name, deal_name FROM deals WHERE id = ?", (deal_id,)).fetchone()
+        if deal is None:
+            raise HTTPException(status_code=404, detail="Deal not found")
+        rows = connection.execute("SELECT * FROM effective_terms WHERE deal_id = ?", (deal_id,)).fetchall()
+        terms = [_row_to_effective_term(row) for row in rows]
+        preview = build_billing_preview(terms, payload.option)
+        identifiers = create_test_billing_setup(deal["customer_name"], deal["deal_name"], preview)
+        cursor = connection.execute(
+            """
+            INSERT INTO razorpay_billing_setups (deal_id, mode, plan_id, customer_id, subscription_id, billing_preview)
+            VALUES (?, 'test', ?, ?, ?, ?)
+            """,
+            (deal_id, identifiers["plan_id"], identifiers["customer_id"], identifiers["subscription_id"], preview.model_dump_json()),
+        )
+        setup_id = int(cursor.lastrowid)
+
+    record_event("deal", deal_id, "prepare_razorpay_test_billing", json.dumps({"setup_id": setup_id, **identifiers, "preview": preview.model_dump()}))
+    return RazorpayBillingSetupResponse(deal_id=deal_id, preview=preview, **identifiers, note="Razorpay Test Mode objects were created. Review the billing configuration before any customer-facing action.")
 
 
 def _analyze_contract_text(text: str, filename: str | None) -> ContractAnalysisResponse:

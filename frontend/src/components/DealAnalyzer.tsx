@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, FileText, Loader2, Save, Send, ShieldCheck, Upload } from "lucide-react";
+import { CheckCircle2, CreditCard, FileText, Loader2, Save, Send, ShieldCheck, Upload } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import {
@@ -23,6 +23,7 @@ import {
   evaluateStressTest,
   optimizeDeal,
   prepareRevisedTerms,
+  prepareRazorpayBilling,
   updateEffectiveTerm,
   type CompanyAssumptions,
   type DealWorkflowStatus,
@@ -36,6 +37,7 @@ import {
   type OptimizeDealResponse,
   type OptimizationOption,
   type PrepareRevisedTermsResponse,
+  type RazorpayBillingSetupResponse,
 } from "@/lib/api";
 
 type EditableTerm = EffectiveTerm & {
@@ -85,11 +87,13 @@ export function DealAnalyzer() {
   const [optimization, setOptimization] = useState<OptimizeDealResponse | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<DealWorkflowStatus>("Draft");
   const [revisedTerms, setRevisedTerms] = useState<PrepareRevisedTermsResponse | null>(null);
+  const [billingSetup, setBillingSetup] = useState<RazorpayBillingSetupResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isStressTesting, setIsStressTesting] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isPreparingBilling, setIsPreparingBilling] = useState(false);
 
   const unresolvedCount = useMemo(
     () => terms.filter((term) => term.review_status === "requires_human_review" || term.ambiguous).length,
@@ -124,6 +128,7 @@ export function DealAnalyzer() {
       setStressTest(null);
       setOptimization(null);
       setRevisedTerms(null);
+      setBillingSetup(null);
       setWorkflowStatus(hasReviewIssues(result.effective_terms) ? "Needs Review" : "AI Analyzed");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deal analysis failed");
@@ -187,6 +192,7 @@ export function DealAnalyzer() {
       setStressTest(result);
       setOptimization(null);
       setRevisedTerms(null);
+      setBillingSetup(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Stress test failed");
     } finally {
@@ -209,6 +215,7 @@ export function DealAnalyzer() {
       });
       setOptimization(result);
       setRevisedTerms(null);
+      setBillingSetup(null);
       setWorkflowStatus(result.workflow_status);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deal optimization failed");
@@ -223,11 +230,27 @@ export function DealAnalyzer() {
     try {
       const result = await prepareRevisedTerms(option);
       setRevisedTerms(result);
+      setBillingSetup(null);
       setWorkflowStatus(result.workflow_status);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Prepare revised terms failed");
     } finally {
       setIsOptimizing(false);
+    }
+  }
+
+  async function prepareBillingSetup(option: OptimizationOption) {
+    if (!deal) return;
+
+    setIsPreparingBilling(true);
+    setError(null);
+    try {
+      const result = await prepareRazorpayBilling(deal.deal_id, option);
+      setBillingSetup(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Razorpay billing setup failed");
+    } finally {
+      setIsPreparingBilling(false);
     }
   }
 
@@ -448,6 +471,9 @@ export function DealAnalyzer() {
                 revisedTerms={revisedTerms}
                 onPrepare={prepareTermsArtifact}
                 isPreparing={isOptimizing}
+                onPrepareBilling={prepareBillingSetup}
+                billingSetup={billingSetup}
+                isPreparingBilling={isPreparingBilling}
               />
             ) : null}
             {stressTest ? <StressTestResult result={stressTest} deal={deal} /> : null}
@@ -699,11 +725,17 @@ function OptimizationResult({
   revisedTerms,
   onPrepare,
   isPreparing,
+  onPrepareBilling,
+  billingSetup,
+  isPreparingBilling,
 }: {
   result: OptimizeDealResponse;
   revisedTerms: PrepareRevisedTermsResponse | null;
   onPrepare: (option: OptimizationOption) => void;
   isPreparing: boolean;
+  onPrepareBilling: (option: OptimizationOption) => void;
+  billingSetup: RazorpayBillingSetupResponse | null;
+  isPreparingBilling: boolean;
 }) {
   const best = result.options[0];
 
@@ -839,6 +871,16 @@ function OptimizationResult({
           <p className="mt-3 rounded-md border border-amber/50 bg-white p-3 text-sm leading-6 text-ink">
             {revisedTerms.approval_note}
           </p>
+          <button
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            onClick={() => onPrepareBilling(best)}
+            disabled={isPreparingBilling}
+          >
+            {isPreparingBilling ? <Loader2 className="animate-spin" size={16} /> : <CreditCard size={16} />}
+            Prepare Billing Setup
+          </button>
+          <p className="mt-2 text-xs leading-5 text-steel">Creates Razorpay Test Mode objects only after this human approval action. It maps the fixed recurring base charge; unsupported contract mechanics stay outside Razorpay.</p>
+          {billingSetup ? <BillingSetupPreview result={billingSetup} /> : null}
         </div>
       ) : null}
 
@@ -853,6 +895,29 @@ function OptimizationResult({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function BillingSetupPreview({ result }: { result: RazorpayBillingSetupResponse }) {
+  return (
+    <div className="mt-4 rounded-md border border-mint/40 bg-mint/10 p-4 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold text-ink">Razorpay Test Mode billing prepared</p>
+        <span className="rounded-md border border-mint/40 bg-white px-2 py-1 text-xs font-semibold text-ink">Test Mode</span>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <SummaryMetric label="Fixed recurring charge" value={result.preview.amount} currency={result.preview.currency} />
+        <SummaryMetric label="Billing period" value={result.preview.period} />
+        <SummaryMetric label="Cycles" value={result.preview.total_count} />
+      </div>
+      <div className="mt-3 grid gap-2 text-xs text-steel sm:grid-cols-3">
+        <p>Plan: <span className="font-medium text-ink">{result.plan_id}</span></p>
+        <p>Customer: <span className="font-medium text-ink">{result.customer_id}</span></p>
+        <p>Subscription: <span className="font-medium text-ink">{result.subscription_id}</span></p>
+      </div>
+      <p className="mt-3 leading-6 text-ink">{result.preview.note}</p>
+      <p className="mt-2 text-xs leading-5 text-steel">Not enforced by Razorpay: {result.preview.unsupported_terms.join("; ")}.</p>
+    </div>
   );
 }
 

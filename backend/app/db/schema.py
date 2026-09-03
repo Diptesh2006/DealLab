@@ -82,6 +82,18 @@ CREATE TABLE IF NOT EXISTS effective_terms (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(deal_id) REFERENCES deals(id)
 );
+
+CREATE TABLE IF NOT EXISTS razorpay_billing_setups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id INTEGER NOT NULL,
+    mode TEXT NOT NULL,
+    plan_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL,
+    subscription_id TEXT NOT NULL,
+    billing_preview TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+);
 """
 
 

@@ -76,6 +76,7 @@ It includes PDF/text contracts, an amendment, an approved exception note, cost a
 - `POST /api/stress-tests/evaluate`: generates the default stress-test scenario set, evaluates each scenario through the deterministic economics engine, and returns deal health.
 - `POST /api/deals/optimize`: creates bounded commercial change candidates, evaluates combinations through the stress-test engine, and returns ranked optimization options.
 - `POST /api/deals/prepare-revised-terms`: prepares a structured commercial recommendation artifact for human approval without modifying legal documents.
+- `POST /api/deals/{deal_id}/billing/razorpay/prepare`: after an explicit human approval action, creates Razorpay **Test Mode** customer, plan, and subscription objects for the fixed recurring base charge and stores their IDs against the deal.
 
 Example:
 
@@ -114,3 +115,14 @@ Health scoring is configurable through `DealHealthConfig`:
 - Recommendation text: explains the deterministic results rather than inventing new financial outcomes.
 
 The MVP optimizer limits changed clauses to one or two by default. It favors options that increase healthy scenario coverage, expected margin, and downside margin while penalizing base price increases, higher commercial friction, and unnecessary clause changes.
+
+## Razorpay Test Mode
+
+Set backend-only credentials in `.env` before using **Prepare Billing Setup**:
+
+```env
+RAZORPAY_KEY_ID=rzp_test_...
+RAZORPAY_KEY_SECRET=...
+```
+
+The browser never receives the secret, and the backend rejects non-test keys. The integration maps only a fixed monthly or yearly recurring base charge. Metered overages, price caps, discounts, support limits, renewal escalation, SLA credits, and contract clauses are not represented as Razorpay-enforced contract terms; they remain in approved commercial and billing operations. Missing credentials return a clear `503` error without affecting contract analysis, stress testing, or optimization.

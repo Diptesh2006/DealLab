@@ -273,6 +273,28 @@ export type PrepareRevisedTermsResponse = {
   approval_note: string;
 };
 
+export type RazorpayBillingPreview = {
+  currency: string;
+  amount: number;
+  amount_subunits: number;
+  period: "monthly" | "yearly";
+  total_count: number;
+  mapped_terms: string[];
+  unsupported_terms: string[];
+  note: string;
+};
+
+export type RazorpayBillingSetupResponse = {
+  deal_id: number;
+  mode: "test";
+  plan_id: string;
+  customer_id: string;
+  subscription_id: string;
+  preview: RazorpayBillingPreview;
+  human_approval_recorded: boolean;
+  note: string;
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export async function getHealth(): Promise<HealthResponse> {
@@ -411,6 +433,26 @@ export async function prepareRevisedTerms(option: OptimizationOption): Promise<P
 
   if (!response.ok) {
     throw new Error(`Prepare revised terms failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function prepareRazorpayBilling(
+  dealId: number,
+  option: OptimizationOption,
+): Promise<RazorpayBillingSetupResponse> {
+  const response = await fetch(`${baseUrl}/api/deals/${dealId}/billing/razorpay/prepare`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ option, human_approved: true }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Razorpay billing setup failed: ${response.status}`);
   }
 
   return response.json();
