@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from backend.app.models.api import ContractTextRequest
+from backend.app.models.api import AuditEventResponse, ContractTextRequest
 from backend.app.models.intelligence import EffectiveTerm, ExtractionType, ReviewStatus
 from backend.app.services.commercial_intelligence import SourceDocument, derive_effective_terms
 from backend.app.services.contract_ingestion import extract_text_from_pdf, normalize_contract_text
@@ -23,6 +23,9 @@ def test_contract_request_and_effective_term_schema_are_validated():
             review_status=ReviewStatus.confirmed,
             ambiguous=False,
         )
+
+    event = AuditEventResponse(id=1, action="analyze_deal", evidence="{}", created_at="2026-10-13 10:00:00")
+    assert event.action == "analyze_deal"
 
 
 def test_acme_demo_pdfs_extract_effective_commercial_terms():
