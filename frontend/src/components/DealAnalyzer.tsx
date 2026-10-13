@@ -377,7 +377,7 @@ export function DealAnalyzer() {
           <RotateCcw size={16} />
           Reset Workspace
         </button>
-        {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+        {error ? <p className="mt-3 text-sm text-red-700" role="alert">{error}</p> : null}
       </form>
 
       <div className="rounded-md border border-ink/10 bg-white">
