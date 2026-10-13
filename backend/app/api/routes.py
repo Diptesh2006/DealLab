@@ -53,6 +53,8 @@ def health() -> HealthResponse:
 @router.get("/deals/{deal_id}/audit", response_model=list[AuditEventResponse])
 def deal_audit_events(deal_id: int) -> list[AuditEventResponse]:
     with get_connection() as connection:
+        if connection.execute("SELECT 1 FROM deals WHERE id = ?", (deal_id,)).fetchone() is None:
+            raise HTTPException(status_code=404, detail="Deal not found")
         events = connection.execute(
             "SELECT id, action, evidence, created_at FROM audit_events WHERE entity_type = 'deal' AND entity_id = ? ORDER BY id DESC",
             (deal_id,),
