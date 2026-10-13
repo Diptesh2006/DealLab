@@ -4,6 +4,13 @@ export type HealthResponse = {
   database: string;
 };
 
+export type AuditEvent = {
+  id: number;
+  action: string;
+  evidence: string;
+  created_at: string;
+};
+
 export type CommercialTerms = {
   customer_name: string | null;
   annual_contract_value: number;
@@ -311,6 +318,12 @@ export async function getHealth(): Promise<HealthResponse> {
     throw new Error(`Backend health check failed: ${response.status}`);
   }
 
+  return response.json();
+}
+
+export async function getDealAudit(dealId: number): Promise<AuditEvent[]> {
+  const response = await fetch(`${baseUrl}/api/deals/${dealId}/audit`, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Audit history failed: ${response.status}`);
   return response.json();
 }
 
