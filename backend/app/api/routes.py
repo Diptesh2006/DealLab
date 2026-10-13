@@ -7,7 +7,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from backend.app.audit.evidence import record_event
 from backend.app.core.config import get_settings
 from backend.app.db.connection import get_connection
-from backend.app.models.api import ContractAnalysisResponse, ContractTextRequest, DemoDealResponse, HealthResponse
+from backend.app.models.api import AuditEventResponse, ContractAnalysisResponse, ContractTextRequest, DemoDealResponse, HealthResponse
 from backend.app.models.billing import PrepareRazorpayBillingRequest, RazorpayBillingSetupResponse
 from backend.app.models.deal import DealAnalysis
 from backend.app.models.economics import EconomicsEvaluationRequest, EconomicsEvaluationResponse
@@ -48,6 +48,16 @@ def health() -> HealthResponse:
     with get_connection() as connection:
         connection.execute("SELECT 1")
     return HealthResponse(status="ok", service=get_settings().app_name, database="ready")
+
+
+@router.get("/deals/{deal_id}/audit", response_model=list[AuditEventResponse])
+def deal_audit_events(deal_id: int) -> list[AuditEventResponse]:
+    with get_connection() as connection:
+        events = connection.execute(
+            "SELECT id, action, evidence, created_at FROM audit_events WHERE entity_type = 'deal' AND entity_id = ? ORDER BY id DESC",
+            (deal_id,),
+        ).fetchall()
+    return [AuditEventResponse(**dict(event)) for event in events]
 
 
 @router.post("/contracts/analyze-text", response_model=ContractAnalysisResponse)
