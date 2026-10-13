@@ -27,3 +27,10 @@ class DemoDealResponse(BaseModel):
     assumptions: CompanyAssumptions
     expected_usage_units: float = Field(ge=0)
     expected_usage_revenue: float = Field(ge=0)
+
+
+class AuditEventResponse(BaseModel):
+    id: int
+    action: str
+    evidence: str
+    created_at: str
