@@ -9,10 +9,15 @@ export function BackendStatus() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function checkHealth() {
+    setError(null);
     getHealth()
       .then(setHealth)
       .catch((err: Error) => setError(err.message));
+  }
+
+  useEffect(() => {
+    checkHealth();
   }, []);
 
   const statusText = error ? "Offline" : health ? "Connected" : "Checking";
@@ -39,7 +44,7 @@ export function BackendStatus() {
           </div>
         </div>
       </div>
-      {error ? <p className="mx-auto max-w-6xl px-6 pb-4 text-sm text-red-700">{error}</p> : null}
+      {error ? <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 pb-4 text-sm text-red-700"><span>{error}</span><button className="font-semibold underline" onClick={checkHealth}>Retry</button></div> : null}
     </section>
   );
 }
