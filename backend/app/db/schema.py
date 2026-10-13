@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS razorpay_billing_setups (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(deal_id) REFERENCES deals(id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_audit_events_entity ON audit_events (entity_type, entity_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_effective_terms_deal ON effective_terms (deal_id, field_name);
 """
 
 
