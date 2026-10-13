@@ -41,6 +41,7 @@ import {
   type PrepareRevisedTermsResponse,
   type RazorpayBillingSetupResponse,
 } from "@/lib/api";
+import { AuditTrail } from "@/components/AuditTrail";
 
 type EditableTerm = EffectiveTerm & {
   draftValue: string;
@@ -546,6 +547,7 @@ export function DealAnalyzer() {
               />
             ) : null}
             {stressTest ? <StressTestResult result={stressTest} deal={deal} /> : null}
+            {deal ? <AuditTrail dealId={deal.deal_id} /> : null}
           </div>
         ) : null}
       </div>
