@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 
 from backend.app.models.deal import DealAnalysis
+from backend.app.models.economics import CompanyAssumptions
+from backend.app.models.intelligence import DealIntelligenceResponse
 
 
 class HealthResponse(BaseModel):
@@ -18,3 +20,10 @@ class ContractAnalysisResponse(BaseModel):
     contract_id: int
     deal_terms_id: int
     analysis: DealAnalysis
+
+
+class DemoDealResponse(BaseModel):
+    deal: DealIntelligenceResponse
+    assumptions: CompanyAssumptions
+    expected_usage_units: float = Field(ge=0)
+    expected_usage_revenue: float = Field(ge=0)

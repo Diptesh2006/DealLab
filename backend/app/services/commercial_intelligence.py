@@ -62,15 +62,15 @@ def _extract_terms_from_document(document: SourceDocument) -> list[EffectiveTerm
     terms: list[EffectiveTerm] = []
 
     patterns = [
-        ("base_annual_price", r"(?:ACV|annual contract value|base annual price)\D+(\$|USD|INR|EUR|GBP)?\s*([0-9,]+(?:\.\d+)?)", "currency_per_year"),
+        ("base_annual_price", r"(?:ACV|annual contract value|annual base price|base annual price)\D+(\$|USD|INR|EUR|GBP)?\s*([0-9,]+(?:\.\d+)?)", "currency_per_year"),
         ("contract_duration", r"(?:term|contract duration|contract term)\D+([0-9]+)\s*(months|month|years|year)", "duration"),
         ("included_usage", r"(?:included usage|included volume)\D+([0-9,]+(?:\.\d+)?)\s*([A-Za-z ]+)", "usage"),
         ("overage_pricing", r"(?:overage|overage pricing)\D+(\$|USD|INR|EUR|GBP)?\s*([0-9,]+(?:\.\d+)?)\s*(?:per|/)\s*([A-Za-z ]+)", "currency_per_unit"),
         ("minimum_commitment", r"(?:minimum commitment|usage commitment)\D+(\$|USD|INR|EUR|GBP)?\s*([0-9,]+(?:\.\d+)?)", "currency"),
-        ("maximum_usage_payment_cap", r"(?:maximum usage|payment cap|usage cap)\D+(\$|USD|INR|EUR|GBP)?\s*([0-9,]+(?:\.\d+)?)", "currency"),
+        ("maximum_usage_payment_cap", r"(?:maximum usage|payment cap|usage cap|overage charges? (?:are )?capped)\D+(\$|USD|INR|EUR|GBP)?\s*([0-9,]+(?:\.\d+)?)", "currency"),
         ("introductory_discount", r"(?:introductory discount|initial discount)\D+([0-9]+(?:\.\d+)?)\s*%", "percent"),
-        ("discount_duration", r"(?:discount duration|introductory period)\D+([0-9]+)\s*(months|month|years|year)", "duration"),
-        ("recurring_discount", r"(?:recurring discount|ongoing discount|discount)\D+([0-9]+(?:\.\d+)?)\s*%", "percent"),
+        ("discount_duration", r"(?:discount duration|introductory period|introductory discount[^.]{0,80}?first)\D*([0-9]+)\s*(months|month|years|year)", "duration"),
+        ("recurring_discount", r"(?:recurring discount|ongoing discount)\D+([0-9]+(?:\.\d+)?)\s*%", "percent"),
         ("renewal_date", r"(?:renewal date|renews on)\D+([A-Za-z]+\s+[0-9]{1,2},?\s+[0-9]{4}|[0-9]{4}-[0-9]{2}-[0-9]{2})", "date"),
         ("renewal_escalation", r"(?:annual increase|renewal uplift|renewal escalation|price increase)\D+([0-9]+(?:\.\d+)?)\s*%", "percent"),
         ("support_allowance", r"(?:support allowance)\D+([0-9,]+(?:\.\d+)?)\s*([A-Za-z ]+)", "allowance"),
@@ -86,8 +86,57 @@ def _extract_terms_from_document(document: SourceDocument) -> list[EffectiveTerm
         if match:
             terms.append(_term_from_match(field_name, match, unit, document))
 
+    annual_usage = re.search(
+        r"includes\s+[0-9,]+(?:\.\d+)?\s+API units per month,\s+equivalent to\s+([0-9,]+(?:\.\d+)?)\s+API units per\s+(?:contract )?year",
+        text,
+        re.IGNORECASE,
+    )
+    if annual_usage:
+        terms.append(
+            _explicit_text_value(
+                "included_usage",
+                annual_usage.group(1).replace(",", ""),
+                "api_units_per_year",
+                annual_usage,
+                document,
+                confidence=0.97,
+            )
+        )
+
+    monthly_overage_cap = re.search(
+        r"monthly overage charges are capped at\s+(?:\$|USD|INR|EUR|GBP)?\s*([0-9,]+(?:\.\d+)?)\s+per month",
+        text,
+        re.IGNORECASE,
+    )
+    if monthly_overage_cap:
+        terms.append(
+            _explicit_text_value(
+                "maximum_usage_payment_cap",
+                monthly_overage_cap.group(1).replace(",", ""),
+                f"{_detect_currency(text) or 'currency'}_per_month",
+                monthly_overage_cap,
+                document,
+                confidence=0.96,
+            )
+        )
+
+    unlimited_support = re.search(r"(?:support allowance[^.]{0,160}?unlimited\s+support|interpreted as unlimited\s+support)", text, re.IGNORECASE)
+    if unlimited_support:
+        terms.append(
+            _explicit_text_value("support_allowance", "unlimited support", "text", unlimited_support, document, confidence=0.82)
+        )
+    no_support_fee = re.search(r"no separate support (?:overage )?fee is specified", text, re.IGNORECASE)
+    if no_support_fee:
+        terms.append(_explicit_text_value("support_pricing", "0", "currency_per_hour", no_support_fee, document, confidence=0.86))
+    no_rebate = re.search(r"no recurring rebate applies", text, re.IGNORECASE)
+    if no_rebate:
+        terms.append(_explicit_text_value("rebates", "0", "percent", no_rebate, document, confidence=0.95))
+    no_recurring_discount = re.search(r"discount does not apply after month\s+[0-9]+", text, re.IGNORECASE)
+    if no_recurring_discount:
+        terms.append(_explicit_text_value("recurring_discount", "0", "percent", no_recurring_discount, document, confidence=0.9))
+
     boolean_clauses = [
-        ("billing_frequency", r"\b(monthly|annual|annually|quarterly)\s+billing\b", "frequency"),
+        ("billing_frequency", r"(?:\b(monthly|annual|annually|quarterly)\s+billing\b|billing frequency is\s+(monthly|annual|annually|quarterly))", "frequency"),
         ("implementation_obligations", r"(implementation obligations?.{0,180})", "text"),
         ("penalty_clauses", r"(penalt(?:y|ies).{0,180})", "text"),
         ("early_termination_clauses", r"(early termination.{0,180})", "text"),
@@ -164,9 +213,10 @@ def _term_from_match(field_name: str, match: re.Match[str], unit: str, document:
 
 
 def _text_term(field_name: str, match: re.Match[str], unit: str, document: SourceDocument) -> EffectiveTerm:
+    value = next((group for group in match.groups() if group), match.group(0))
     return EffectiveTerm(
         field_name=field_name,
-        normalized_value=match.group(1).strip(),
+        normalized_value=value.strip(),
         unit=unit,
         source_document=document.filename,
         source_page=1,
@@ -175,6 +225,28 @@ def _text_term(field_name: str, match: re.Match[str], unit: str, document: Sourc
         extraction_type=ExtractionType.explicit,
         review_status=ReviewStatus.requires_human_review,
         ambiguous=True,
+    )
+
+
+def _explicit_text_value(
+    field_name: str,
+    value: str,
+    unit: str,
+    match: re.Match[str],
+    document: SourceDocument,
+    confidence: float,
+) -> EffectiveTerm:
+    return EffectiveTerm(
+        field_name=field_name,
+        normalized_value=value,
+        unit=unit,
+        source_document=document.filename,
+        source_page=1,
+        evidence_excerpt=_excerpt(document.text, match.start(), match.end()),
+        confidence=confidence,
+        extraction_type=ExtractionType.explicit,
+        review_status=ReviewStatus.confirmed,
+        ambiguous=False,
     )
 
 

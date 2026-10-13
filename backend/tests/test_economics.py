@@ -73,6 +73,32 @@ def test_currency_formatting_supports_indian_and_international_grouping():
     assert format_currency(3000000, "USD") == "$3,000,000.00"
 
 
+def test_monthly_overage_cap_is_annualized_before_deterministic_revenue_calculation():
+    result = evaluate_financial_scenario(
+        terms=[
+            term("currency", "INR", "iso_currency"),
+            term("base_annual_price", "3000000", "currency_per_year"),
+            term("included_usage", "12000000", "api_calls_per_year"),
+            term("overage_pricing", "0.2", "INR_per_api_call"),
+            term("maximum_usage_payment_cap", "100000", "INR_per_month"),
+        ],
+        assumptions=CompanyAssumptions(
+            cost_per_api_call=0,
+            monthly_infrastructure_cost=0,
+            cost_per_support_hour=0,
+            implementation_cost=0,
+            minimum_acceptable_gross_margin=55,
+            typical_support_consumption_hours=0,
+            expected_annual_cost_inflation=0,
+        ),
+        scenario=EconomicScenarioInput(name="High adoption", expected_usage_units=24_000_000),
+    )
+
+    assert result.gross_revenue == 4_200_000
+    assert next(line.amount for line in result.breakdown if line.label == "Overage revenue") == 1_200_000
+    assert next(line.amount for line in result.breakdown if line.label == "Revenue cap adjustment") == -1_200_000
+
+
 def term(field_name: str, value: str, unit: str) -> EffectiveTerm:
     return EffectiveTerm(
         field_name=field_name,

@@ -75,6 +75,13 @@ export type DealIntelligenceResponse = {
   effective_terms: EffectiveTerm[];
 };
 
+export type DemoDealResponse = {
+  deal: DealIntelligenceResponse;
+  assumptions: CompanyAssumptions;
+  expected_usage_units: number;
+  expected_usage_revenue: number;
+};
+
 export type CompanyAssumptions = {
   cost_per_api_call: number;
   monthly_infrastructure_cost: number;
@@ -333,6 +340,14 @@ export async function analyzeDeal(formData: FormData): Promise<DealIntelligenceR
     throw new Error(`Deal analysis failed: ${response.status}`);
   }
 
+  return response.json();
+}
+
+export async function loadAcmeDemoDeal(): Promise<DemoDealResponse> {
+  const response = await fetch(`${baseUrl}/api/demo/acme`, { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`Demo deal load failed: ${response.status}`);
+  }
   return response.json();
 }
 

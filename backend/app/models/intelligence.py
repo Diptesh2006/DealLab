@@ -3,6 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
+
 class DocumentType(str, Enum):
     master_agreement = "master_agreement"
     amendment = "amendment"

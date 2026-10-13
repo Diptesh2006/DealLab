@@ -7,7 +7,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from backend.app.audit.evidence import record_event
 from backend.app.core.config import get_settings
 from backend.app.db.connection import get_connection
-from backend.app.models.api import ContractAnalysisResponse, ContractTextRequest, HealthResponse
+from backend.app.models.api import ContractAnalysisResponse, ContractTextRequest, DemoDealResponse, HealthResponse
 from backend.app.models.billing import PrepareRazorpayBillingRequest, RazorpayBillingSetupResponse
 from backend.app.models.deal import DealAnalysis
 from backend.app.models.economics import EconomicsEvaluationRequest, EconomicsEvaluationResponse
@@ -20,6 +20,7 @@ from backend.app.models.intelligence import (
     ManualTermEditResponse,
     ReviewStatus,
 )
+from backend.app.models.economics import CompanyAssumptions
 from backend.app.models.optimization import (
     OptimizeDealRequest,
     OptimizeDealResponse,
@@ -39,6 +40,7 @@ from backend.app.simulation.economics import evaluate_financial_scenario
 from backend.app.simulation.stress import run_stress_test
 
 router = APIRouter()
+DEMO_DIRECTORY = Path(__file__).resolve().parents[3] / "demo" / "acme-enterprise"
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -147,6 +149,70 @@ async def analyze_deal(
         target_gross_margin=target_gross_margin,
         documents=persisted_documents,
         effective_terms=persisted_terms,
+    )
+
+
+@router.post("/demo/acme", response_model=DemoDealResponse)
+def load_acme_demo_deal() -> DemoDealResponse:
+    document_specs = [
+        ("contract.pdf", DocumentType.master_agreement.value, 0),
+        ("amendment-1.pdf", DocumentType.amendment.value, 1),
+        ("approved-exception.pdf", DocumentType.approved_exception.value, 2),
+    ]
+    documents = [
+        {
+            "filename": filename,
+            "document_type": document_type,
+            "precedence_order": precedence_order,
+            "raw_text": normalize_contract_text(extract_text_from_pdf(DEMO_DIRECTORY / filename)),
+        }
+        for filename, document_type, precedence_order in document_specs
+    ]
+    cost_data = json.loads((DEMO_DIRECTORY / "cost-assumptions.json").read_text(encoding="utf-8"))
+    scenario_data = json.loads((DEMO_DIRECTORY / "sample-scenarios.json").read_text(encoding="utf-8"))
+    assumptions = CompanyAssumptions(**cost_data["assumptions"])
+    effective_terms = derive_effective_terms(
+        [
+            SourceDocument(
+                filename=document["filename"],
+                document_type=document["document_type"],
+                precedence_order=document["precedence_order"],
+                text=document["raw_text"],
+            )
+            for document in documents
+        ]
+    )
+
+    with get_connection() as connection:
+        deal_cursor = connection.execute(
+            """INSERT INTO deals (customer_name, deal_name, target_gross_margin, internal_cost_assumptions)
+            VALUES (?, ?, ?, ?)""",
+            ("ACME Enterprise", "AsterGrid Enterprise API Platform", assumptions.minimum_acceptable_gross_margin, json.dumps(cost_data["assumptions"])),
+        )
+        deal_id = int(deal_cursor.lastrowid)
+        persisted_documents = []
+        for document in documents:
+            document_cursor = connection.execute(
+                """INSERT INTO deal_documents (deal_id, filename, document_type, precedence_order, raw_text)
+                VALUES (?, ?, ?, ?, ?)""",
+                (deal_id, document["filename"], document["document_type"], document["precedence_order"], document["raw_text"]),
+            )
+            persisted_documents.append(DealDocument(id=int(document_cursor.lastrowid), filename=document["filename"], document_type=document["document_type"], precedence_order=document["precedence_order"]))
+        persisted_terms = [_insert_effective_term(connection, deal_id, term) for term in effective_terms]
+
+    record_event("deal", deal_id, "load_synthetic_acme_demo", json.dumps({"document_count": len(documents), "term_count": len(persisted_terms)}))
+    return DemoDealResponse(
+        deal=DealIntelligenceResponse(
+            deal_id=deal_id,
+            customer_name="ACME Enterprise",
+            deal_name="AsterGrid Enterprise API Platform",
+            target_gross_margin=assumptions.minimum_acceptable_gross_margin,
+            documents=persisted_documents,
+            effective_terms=persisted_terms,
+        ),
+        assumptions=assumptions,
+        expected_usage_units=scenario_data["expected_usage_units"],
+        expected_usage_revenue=scenario_data["expected_usage_revenue"],
     )
 
 

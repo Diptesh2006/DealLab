@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, CreditCard, FileText, Loader2, Save, Send, ShieldCheck, Upload } from "lucide-react";
+import { CheckCircle2, CreditCard, FileText, Loader2, RotateCcw, Save, Send, ShieldCheck, Upload } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import {
@@ -21,6 +21,7 @@ import {
   analyzeDeal,
   evaluateEconomics,
   evaluateStressTest,
+  loadAcmeDemoDeal,
   optimizeDeal,
   prepareRevisedTerms,
   prepareRazorpayBilling,
@@ -28,6 +29,7 @@ import {
   type CompanyAssumptions,
   type DealWorkflowStatus,
   type DealIntelligenceResponse,
+  type DemoDealResponse,
   type EconomicScenarioInput,
   type EffectiveTerm,
   type ReviewStatus,
@@ -53,6 +55,27 @@ const statusStyles: Record<ReviewStatus, string> = {
   requires_human_review: "border-red-300 bg-red-50 text-red-900",
 };
 
+const defaultAssumptions: CompanyAssumptions = {
+  cost_per_api_call: 0.2,
+  monthly_infrastructure_cost: 60000,
+  cost_per_support_hour: 1000,
+  implementation_cost: 200000,
+  minimum_acceptable_gross_margin: 45,
+  typical_support_consumption_hours: 550,
+  expected_annual_cost_inflation: 0,
+};
+
+const defaultScenario: EconomicScenarioInput = {
+  name: "Expected case",
+  expected_usage_units: 1200000,
+  usage_revenue: 240000,
+  support_hours: null,
+  apply_temporary_discount: true,
+  apply_service_credits: true,
+  apply_rebates: true,
+  renewal_number: 1,
+};
+
 export function DealAnalyzer() {
   const [customerName, setCustomerName] = useState("Globex");
   const [dealName, setDealName] = useState("Global API Platform Renewal");
@@ -63,25 +86,8 @@ export function DealAnalyzer() {
   const [exceptionNotes, setExceptionNotes] = useState<File[]>([]);
   const [deal, setDeal] = useState<DealIntelligenceResponse | null>(null);
   const [terms, setTerms] = useState<EditableTerm[]>([]);
-  const [assumptions, setAssumptions] = useState<CompanyAssumptions>({
-    cost_per_api_call: 0.2,
-    monthly_infrastructure_cost: 60000,
-    cost_per_support_hour: 1000,
-    implementation_cost: 200000,
-    minimum_acceptable_gross_margin: 45,
-    typical_support_consumption_hours: 550,
-    expected_annual_cost_inflation: 0,
-  });
-  const [scenario, setScenario] = useState<EconomicScenarioInput>({
-    name: "Expected case",
-    expected_usage_units: 1200000,
-    usage_revenue: 240000,
-    support_hours: null,
-    apply_temporary_discount: true,
-    apply_service_credits: true,
-    apply_rebates: true,
-    renewal_number: 1,
-  });
+  const [assumptions, setAssumptions] = useState<CompanyAssumptions>(defaultAssumptions);
+  const [scenario, setScenario] = useState<EconomicScenarioInput>(defaultScenario);
   const [economics, setEconomics] = useState<ScenarioEconomicsResult | null>(null);
   const [stressTest, setStressTest] = useState<StressTestResponse | null>(null);
   const [optimization, setOptimization] = useState<OptimizeDealResponse | null>(null);
@@ -90,6 +96,7 @@ export function DealAnalyzer() {
   const [billingSetup, setBillingSetup] = useState<RazorpayBillingSetupResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isStressTesting, setIsStressTesting] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -100,7 +107,51 @@ export function DealAnalyzer() {
     [terms],
   );
 
-  const canApproveForSimulation = terms.length > 0 && unresolvedCount === 0;
+  const blockingFields = new Set([
+    "base_annual_price", "currency", "included_usage", "overage_pricing", "maximum_usage_payment_cap",
+    "introductory_discount", "recurring_discount", "support_allowance", "support_pricing", "service_credits",
+  ]);
+  const canApproveForSimulation = terms.length > 0 && !terms.some((term) => blockingFields.has(term.field_name) && (term.review_status === "requires_human_review" || term.ambiguous));
+
+  function applyDeal(result: DealIntelligenceResponse, demo?: DemoDealResponse) {
+    setDeal(result);
+    setTerms(result.effective_terms.map(toEditableTerm));
+    setEconomics(null);
+    setStressTest(null);
+    setOptimization(null);
+    setRevisedTerms(null);
+    setBillingSetup(null);
+    if (demo) {
+      setAssumptions(demo.assumptions);
+      setScenario((current) => ({ ...current, name: "Expected adoption", expected_usage_units: demo.expected_usage_units, usage_revenue: demo.expected_usage_revenue }));
+      setCustomerName(result.customer_name);
+      setDealName(result.deal_name);
+      setTargetGrossMargin(String(result.target_gross_margin));
+      setInternalCostAssumptions("Synthetic ACME cost assumptions loaded from demo dataset.");
+    }
+    setWorkflowStatus(hasReviewIssues(result.effective_terms.filter((term) => blockingFields.has(term.field_name))) ? "Needs Review" : "AI Analyzed");
+  }
+
+  function resetWorkspace() {
+    setCustomerName("Globex");
+    setDealName("Global API Platform Renewal");
+    setTargetGrossMargin("55");
+    setInternalCostAssumptions("Support cost sensitivity enabled");
+    setMainContract(null);
+    setAmendments([]);
+    setExceptionNotes([]);
+    setAssumptions(defaultAssumptions);
+    setScenario(defaultScenario);
+    setDeal(null);
+    setTerms([]);
+    setEconomics(null);
+    setStressTest(null);
+    setOptimization(null);
+    setRevisedTerms(null);
+    setBillingSetup(null);
+    setWorkflowStatus("Draft");
+    setError(null);
+  }
 
   async function submit() {
     if (!mainContract) {
@@ -122,18 +173,24 @@ export function DealAnalyzer() {
 
     try {
       const result = await analyzeDeal(formData);
-      setDeal(result);
-      setTerms(result.effective_terms.map(toEditableTerm));
-      setEconomics(null);
-      setStressTest(null);
-      setOptimization(null);
-      setRevisedTerms(null);
-      setBillingSetup(null);
-      setWorkflowStatus(hasReviewIssues(result.effective_terms) ? "Needs Review" : "AI Analyzed");
+      applyDeal(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deal analysis failed");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadDemo() {
+    setIsLoadingDemo(true);
+    setError(null);
+    try {
+      const result = await loadAcmeDemoDeal();
+      applyDeal(result.deal, result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Demo deal load failed");
+    } finally {
+      setIsLoadingDemo(false);
     }
   }
 
@@ -306,6 +363,18 @@ export function DealAnalyzer() {
         >
           {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
           Analyze Deal
+        </button>
+        <button
+          className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+          onClick={loadDemo}
+          disabled={isLoadingDemo || isLoading}
+        >
+          {isLoadingDemo ? <Loader2 className="animate-spin" size={16} /> : <FileText size={16} />}
+          Load Demo Deal
+        </button>
+        <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-ink/15 px-4 py-2 text-sm font-semibold text-ink" onClick={resetWorkspace}>
+          <RotateCcw size={16} />
+          Reset Workspace
         </button>
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
       </form>

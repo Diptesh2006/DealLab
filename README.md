@@ -126,3 +126,15 @@ RAZORPAY_KEY_SECRET=...
 ```
 
 The browser never receives the secret, and the backend rejects non-test keys. The integration maps only a fixed monthly or yearly recurring base charge. Metered overages, price caps, discounts, support limits, renewal escalation, SLA credits, and contract clauses are not represented as Razorpay-enforced contract terms; they remain in approved commercial and billing operations. Missing credentials return a clear `503` error without affecting contract analysis, stress testing, or optimization.
+
+## 2-Minute Judge Demo
+
+1. Start the backend and frontend, then open `http://localhost:3000`. Confirm the backend status reads ready.
+2. Click **Load Demo Deal**. DealLab parses the synthetic ACME master agreement, amendment, and approved exception from PDF, stores the deal, and opens the Deal Terms Review table.
+3. Point out the confirmed annual price, included usage, overage ceiling, temporary discount, unlimited support interpretation, and the amendment-driven first renewal uplift of `0%`. Unknown non-economic clauses remain visibly marked for review.
+4. Review the loaded company assumptions, then click **Approve for Simulation** and **Run Stress Test**. The Deal Health dashboard shows scenario coverage, expected margin, downside margin, annual exposure, and critical failure modes.
+5. Open the high-adoption and support-heavy scenario rows to show the deterministic financial breakdown and source labels. Use the failure-mode cards to connect the clause, scenario, calculation, and commercial consequence.
+6. Click **Optimize Deal**. Compare Current Deal and Optimized Deal, with the changed terms, scenario coverage, annual exposure, customer impact, and trust trace shown side by side.
+7. Click **Prepare Revised Terms**. Review the human-approval-only commercial recommendation; no contract document is changed.
+8. With `RAZORPAY_KEY_ID=rzp_test_...` and `RAZORPAY_KEY_SECRET` configured on the backend, click **Prepare Billing Setup**. The preview shows the Test Mode fixed recurring billing configuration and IDs, while identifying usage, discount, support, SLA, and legal terms Razorpay does not enforce. Without keys, the clear credentials error demonstrates that the core DealLab workflow remains independent.
+9. Click **Reset Workspace** to return to a clean new-deal screen for another run.
