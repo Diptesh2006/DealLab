@@ -76,6 +76,7 @@ It includes PDF/text contracts, an amendment, an approved exception note, cost a
 - `POST /api/stress-tests/evaluate`: generates the default stress-test scenario set, evaluates each scenario through the deterministic economics engine, and returns deal health.
 - `POST /api/deals/optimize`: creates bounded commercial change candidates, evaluates combinations through the stress-test engine, and returns ranked optimization options.
 - `POST /api/deals/prepare-revised-terms`: prepares a structured commercial recommendation artifact for human approval without modifying legal documents.
+- `GET /api/deals/{deal_id}/audit`: returns the recorded deal workflow events in reverse chronological order.
 - `POST /api/deals/{deal_id}/billing/razorpay/prepare`: after an explicit human approval action, creates Razorpay **Test Mode** customer, plan, and subscription objects for the fixed recurring base charge and stores their IDs against the deal.
 
 Example:
